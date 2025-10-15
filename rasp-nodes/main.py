@@ -1,16 +1,13 @@
-from evdev import InputDevice, categorize, ecodes
-import threading
+# main.py
+from libs.keyboard import start_keyboard
+import time
 
-def read_keyboard():
-    dev = InputDevice('/dev/input/event0');
-    for event in dev.read_loop():
-        if event.type == ecodes.EV_KEY:
-            key = categorize(event)
-            if key.keystate == key.key_down:
-                print(f"Tecla pressionada: {key.keycode}")
+# Inicia o teclado no device correto
+kb = start_keyboard('/dev/input/event1')
 
-
-t = threading.Thread(target=read_keyboard, daemon=True)
-t.start()
-
+while True:
+    # Lê o buffer atual
+    buf = kb.get_buffer()
+    print("\rDigitado:", buf, end="", flush=True)
+    time.sleep(0.5)
 
