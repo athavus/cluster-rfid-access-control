@@ -1,0 +1,14 @@
+##[pylyzer] failed /home/athavus/Projects/embarcados/raspberry/pi/cluster-rfid-access-control/server/consumer.py 1760572698 0
+.pika = pyimport "__init__"
+.__init__ = pyimport "__init__"
+
+.json: Never
+
+.threading: Never
+
+.time: Never
+
+.___v_desugar_1 = pyimport "main"
+.main = pyimport "main"
+.received_messages: Never
+.rabbit_consumer: Never

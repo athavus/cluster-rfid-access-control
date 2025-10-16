@@ -1,4 +1,3 @@
-
 # SPDX-FileCopyrightText: 2018 Tony DiCola for Adafruit Industries
 # SPDX-FileCopyrightText: 2017 James DeVito for Adafruit Industries
 # SPDX-License-Identifier: MIT
