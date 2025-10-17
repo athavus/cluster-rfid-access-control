@@ -10,7 +10,7 @@ def publish_fake_data():
     cont_messages = 0
 
     while True:
-        try:        
+        try: 
             data = {
                 "id": random.randint(1, 100),
                 "mem_usage": f"{random.randint(100, 700)} MB",
@@ -22,7 +22,9 @@ def publish_fake_data():
             cont_messages += 1
             time.sleep(0.1)
         except KeyboardInterrupt:
-            print(f"Foram enviadas: {cont_messages} mensagens")
+            break
+    return cont_messages
 
 if __name__ == "__main__":
-    publish_fake_data()
+    cont_messages = publish_fake_data()
+    print(f"Foram enviadas: {cont_messages} mensagens")
