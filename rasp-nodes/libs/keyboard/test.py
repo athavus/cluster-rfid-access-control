@@ -1,4 +1,4 @@
-from keyboard import start_keyboard
+from .keyboard import start_keyboard
 import time
 
 # Inicializa o teclado
