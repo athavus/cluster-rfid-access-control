@@ -10,8 +10,15 @@ def get_connected_ssid():
 def list_available_ssids():
     try:
         cmd = "nmcli -t -f ssid dev wifi | sort -u"
-        ssids = subprocess.check_output(cmd, shell=True).decode("utf-8").splitlines()
-        return [s for s in ssids if s]
+        available_ssids = subprocess.check_output(cmd, shell=True).decode("utf-8").splitlines()
+        
+        valid_ssids = []
+        
+        for ssid in available_ssids:
+            if ssid:
+                valid_ssids.append(ssid)
+
+        return valid_ssids
     except subprocess.CalledProcessError:
         return []
 
@@ -25,6 +32,7 @@ def connect_to_wifi(ssid, password):
 
 def get_network_info():
     info = {}
+    
     info['HOST'] = subprocess.check_output("hostname", shell=True).decode("utf-8").strip()
     info['IP'] = subprocess.check_output("hostname -I | cut -d' ' -f1", shell=True).decode("utf-8").strip()
     
@@ -37,4 +45,5 @@ def get_network_info():
     info['SSH'] = subprocess.check_output("systemctl is-active ssh", shell=True).decode("utf-8").strip()
     info['USERS'] = subprocess.check_output("w -h | wc -l", shell=True).decode("utf-8").strip()
     info['SSID'] = get_connected_ssid()
+    
     return info
