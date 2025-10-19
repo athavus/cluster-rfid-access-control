@@ -1,0 +1,5 @@
+client/node_modules/
+rasp-nodes/venv/
+rasp-nodes/libs/__pycache__/
+server/venv/
+server/__pycache__/
