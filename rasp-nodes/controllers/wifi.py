@@ -41,9 +41,9 @@ def known_connections():
 def connect_to_wifi(ssid, password):
     try:
         if ssid in known_connections():
-            cmd = f"nmcli con up '{ssid}'"
+            cmd = f"sudo nmcli con up '{ssid}'"
         else:
-            cmd = f"nmcli dev wifi connect '{ssid}' password '{password}'"
+            cmd = f"sudo nmcli dev wifi connect '{ssid}' password '{password}'"
         subprocess.check_output(cmd, shell=True)
         return True
     except subprocess.CalledProcessError:
