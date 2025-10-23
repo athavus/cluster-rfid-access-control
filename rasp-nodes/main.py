@@ -6,19 +6,20 @@ from controllers.keyboard import start_keyboard_listener, get_buffer, clear_buff
 start_keyboard_listener()
 
 try:
-    display_message("", "Inicializando...", "", "Sistema WiFi v1.0", "")
-    time.sleep(2)
+    display_message("", "Inicializando...", "", "Sistema", "")
+    time.sleep(1)
 
     while True:
         ssid = get_connected_ssid()
 
         if ssid:
+            # Mostra info da rede conectada
             info = get_network_info()
             draw_network_info(info)
             time.sleep(0.1)
 
             buf = get_buffer()
-            if buf.endswith("\x1b"):
+            if buf.endswith("\x1b"):  # ESC para abrir seleção SSID
                 clear_buffer()
                 selecting_ssid = True
                 available_ssids = list_available_ssids()
@@ -34,16 +35,16 @@ try:
                     time.sleep(0.1)
                     buf = get_buffer()
 
-                    if buf.endswith("\x1b[A"):
+                    if buf.endswith("\x1b[A"):  # seta cima
                         index = (index - 1) % len(available_ssids)
                         clear_buffer()
-                    elif buf.endswith("\x1b[B"):
+                    elif buf.endswith("\x1b[B"):  # seta baixo
                         index = (index + 1) % len(available_ssids)
                         clear_buffer()
-                    elif buf.endswith("\x1b"):
+                    elif buf.endswith("\x1b"):  # ESC para sair
                         clear_buffer()
                         selecting_ssid = False
-                    elif buf.endswith("\r"):
+                    elif buf.endswith("\r"):  # Enter para conectar
                         selected_ssid = available_ssids[index]
                         clear_buffer()
                         password = ""
@@ -57,19 +58,17 @@ try:
                             if current_buffer.endswith("\r"):
                                 password = current_buffer.rstrip("\r\n")
                                 clear_buffer()
-                                display_message("", "Conectando...", "", f"SSID: {selected_ssid[:15]}", "Aguarde...")
+                                display_message("", "Conectando...", "", f"SSID: {selected_ssid[:19]}", "Aguarde...")
                                 success = connect_to_wifi(selected_ssid, password)
-                                display_message("", 
+                                display_message("",
                                     "Conectado!" if success else "Falha na conexao!",
-                                    "", f"SSID: {selected_ssid[:15]}",
+                                    "", f"SSID: {selected_ssid[:19]}",
                                     "" if success else "Tente novamente...")
-                                time.sleep(2)
                                 entering_password = False
                                 selecting_ssid = False
-                            elif current_buffer.endswith("\x1b"):
+                            elif current_buffer.endswith("\x1b"):  # ESC cancelar senha
                                 clear_buffer()
                                 display_message("", "Cancelado!", "", "Voltando ao menu...", "")
-                                time.sleep(1)
                                 entering_password = False
                             else:
                                 password = current_buffer
@@ -81,7 +80,7 @@ try:
 
             if not available_ssids:
                 display_message("", "Nenhuma rede", "encontrada!", "", "Tentando novamente...")
-                time.sleep(3)
+                time.sleep(1)
                 continue
 
             index, scroll_offset = 0, 0
@@ -105,8 +104,7 @@ try:
                     clear_buffer()
                 elif buf.endswith("\x1b"):
                     clear_buffer()
-                    display_message("", "Atualizando lista...", "", "Aguarde...", "")
-                    time.sleep(1)
+                    display_message("", "Atualizando lista...", "", "Aguarde...", "") 
                     break
                 elif buf.endswith("\r"):
                     selected_ssid = available_ssids[index]
@@ -122,26 +120,25 @@ try:
                         if current_buffer.endswith("\r"):
                             password = current_buffer.rstrip("\r\n")
                             clear_buffer()
-                            display_message("", "Conectando...", "", f"SSID: {selected_ssid[:15]}", "Aguarde...")
+                            display_message("", "Conectando...", "", f"SSID: {selected_ssid[:19]}", "Aguarde...")
                             success = connect_to_wifi(selected_ssid, password)
-                            display_message("", 
+                            display_message("",
                                 "Conectado!" if success else "Falha na conexao!",
-                                "", f"SSID: {selected_ssid[:15]}",
+                                "", f"SSID: {selected_ssid[:19]}",
                                 "" if success else "Tente novamente...")
-                            time.sleep(2)
                             entering_password = False
                             selecting_ssid = False
                         elif current_buffer.endswith("\x1b"):
                             clear_buffer()
                             display_message("", "Cancelado!", "", "Voltando ao menu...", "")
-                            time.sleep(1)
                             entering_password = False
                         else:
                             password = current_buffer
 
 except KeyboardInterrupt:
     display_message("", "", "Sistema", "Finalizado", "")
-    time.sleep(2)
+    time.sleep(1)
     from controllers.display import disp
     disp.fill(0)
     disp.show()
+
