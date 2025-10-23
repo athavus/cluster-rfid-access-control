@@ -8,6 +8,7 @@ adafruit-circuitpython-typing==1.12.2
 Adafruit-PlatformDetect==3.84.1
 Adafruit-PureIO==1.1.11
 binho-host-adapter==0.1.6
+evdev==1.9.2
 pillow==12.0.0
 pyftdi==0.57.1
 pyserial==3.5

@@ -52,6 +52,21 @@ class Keyboard:
                 if self.buffer:
                     self.buffer.pop()
 
+            # ESC
+            elif key.keycode == 'KEY_ESC' and key.keystate == key.key_down:
+                self.buffer.append('\x1b')  # ESC código ASCII
+
+            # Setas para cima e baixo
+            elif key.keycode == 'KEY_UP' and key.keystate == key.key_down:
+                self.buffer.append('\x1b[A')  # seq. escape para seta cima
+
+            elif key.keycode == 'KEY_DOWN' and key.keystate == key.key_down:
+                self.buffer.append('\x1b[B')  # seq. escape para seta baixo
+
+            # Enter
+            elif key.keycode in ['KEY_ENTER', 'KEY_KPENTER'] and key.keystate == key.key_down:
+                self.buffer.append('\r')
+
             # Chars
             elif key.keystate == key.key_down:
                 if key.keycode in self.keycode_map:
