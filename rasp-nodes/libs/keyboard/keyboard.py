@@ -3,14 +3,16 @@ import threading
 
 class Keyboard:
     def __init__(self, device_path):
-        # ----------------------------------------------------------------------
-        # @brief Construtor da classe Keyboard.
-        # 
-        # Inicializa o dispositivo de entrada, variáveis de controle para teclas especiais
-        # (CapsLock, ESC) e o mapeamento de teclas normais e com Shift.
-        #
-        # @param device_path Caminho do dispositivo de teclado (ex: "/dev/input/event0").
-        # ----------------------------------------------------------------------
+        """
+        ----------------------------------------------------------------------
+        @brief Construtor da classe Keyboard.
+        
+        Inicializa o dispositivo de entrada, variáveis de controle para teclas especiais
+        (CapsLock, ESC) e o mapeamento de teclas normais e com Shift.
+
+        @param device_path: Caminho do dispositivo de teclado (ex: "/dev/input/event0").
+        ----------------------------------------------------------------------
+        """
         self.dev = InputDevice(device_path)
         self.caps_lock = False
         self.shift_pressed = False
@@ -42,18 +44,19 @@ class Keyboard:
             ';': ':', "'": '"', ',': '<', '.': '>', '/': '?'
         }
 
-
     def process_key(self, key):
-        # ----------------------------------------------------------------------
-        # @brief Processa um evento de tecla e atualiza o buffer interno.
-        #
-        # Trata teclas especiais (CapsLock, Shift, Backspace, Enter, ESC, setas)
-        # e converte códigos de teclas em caracteres ASCII correspondentes.
-        #
-        # @param key Evento de tecla categorizado (objeto retornado por categorize()).
-        #
-        # @return O caractere processado (se houver), ou None se nenhuma tecla útil foi registrada.
-        # ----------------------------------------------------------------------
+        """
+        ----------------------------------------------------------------------
+        @brief Processa um evento de tecla e atualiza o buffer interno.
+
+        Trata teclas especiais (CapsLock, Shift, Backspace, Enter, ESC, setas)
+        e converte códigos de teclas em caracteres ASCII correspondentes.
+
+        @param key: Evento de tecla categorizado (objeto retornado por categorize()).
+
+        @return O caractere processado (se houver), ou None se nenhuma tecla útil foi registrada.
+        ----------------------------------------------------------------------
+        """
         with self.lock:
             # Caps Lock
             if key.keycode == 'KEY_CAPSLOCK' and key.keystate == key.key_down:
@@ -75,12 +78,11 @@ class Keyboard:
             elif key.keycode == 'KEY_ESC' and key.keystate == key.key_down:
                 self.buffer.append('\x1b')  # ESC ASCII
 
-            # Setas para cima e baixo
+            # Setas
             elif key.keycode == 'KEY_UP' and key.keystate == key.key_down:
-                self.buffer.append('\x1b[A')  # seq. escape para seta cima
-
+                self.buffer.append('\x1b[A')  # seta cima
             elif key.keycode == 'KEY_DOWN' and key.keystate == key.key_down:
-                self.buffer.append('\x1b[B')  # seq. escape para seta baixo
+                self.buffer.append('\x1b[B')  # seta baixo
 
             # Enter
             elif key.keycode in ['KEY_ENTER', 'KEY_KPENTER'] and key.keystate == key.key_down:
@@ -105,67 +107,72 @@ class Keyboard:
                     return char
         return None
 
-
     def keyboard_loop(self):
-        # ----------------------------------------------------------------------
-        # @brief Loop contínuo que lê eventos do dispositivo e processa teclas.
-        #
-        # Essa função bloqueia o thread e deve ser usada em uma thread separada.
-        # Lê os eventos do teclado e envia cada evento de tecla para process_key().
-        #
-        # @return None
-        # ----------------------------------------------------------------------
+        """
+        ----------------------------------------------------------------------
+        @brief Loop contínuo que lê eventos do dispositivo e processa teclas.
+
+        Essa função bloqueia o thread e deve ser usada em uma thread separada.
+        Lê os eventos do teclado e envia cada evento de tecla para process_key().
+
+        @return None
+        ----------------------------------------------------------------------
+        """
         for event in self.dev.read_loop():
             if event.type == ecodes.EV_KEY:
                 key = categorize(event)
                 self.process_key(key)
 
-
     def start(self):
-        # ----------------------------------------------------------------------
-        # @brief Inicia o monitoramento do teclado em um thread separado.
-        #
-        # Cria e inicia uma thread daemon para o método keyboard_loop().
-        #
-        # @return None
-        # ----------------------------------------------------------------------
+        """
+        ----------------------------------------------------------------------
+        @brief Inicia o monitoramento do teclado em um thread separado.
+
+        Cria e inicia uma thread daemon para o método keyboard_loop().
+
+        @return None
+        ----------------------------------------------------------------------
+        """
         t = threading.Thread(target=self.keyboard_loop, daemon=True)
         t.start()
 
-
     def get_buffer(self):
-        # ----------------------------------------------------------------------
-        # @brief Retorna o conteúdo atual do buffer de entrada.
-        #
-        # @return Uma string com todos os caracteres digitados até o momento.
-        # ----------------------------------------------------------------------
+        """
+        ----------------------------------------------------------------------
+        @brief Retorna o conteúdo atual do buffer de entrada.
+
+        @return Uma string com todos os caracteres digitados até o momento.
+        ----------------------------------------------------------------------
+        """
         with self.lock:
             return "".join(self.buffer)
 
-
     def clear_buffer(self):
-        # ----------------------------------------------------------------------
-        # @brief Limpa o buffer de entrada.
-        #
-        # Remove todos os caracteres armazenados.
-        #
-        # @return None
-        # ----------------------------------------------------------------------
+        """
+        ----------------------------------------------------------------------
+        @brief Limpa o buffer de entrada.
+
+        Remove todos os caracteres armazenados.
+
+        @return None
+        ----------------------------------------------------------------------
+        """
         with self.lock:
             self.buffer.clear()
 
-
     def listen(self, callback):
-        # ----------------------------------------------------------------------
-        # @brief Escuta continuamente o buffer chamando uma função callback para cada novo caractere.
-        #
-        # Essa função compara o buffer anterior com o atual e chama a função callback
-        # passada pelo usuário a cada novo caractere recebido.
-        #
-        # @param callback Função que será chamada com um argumento (caractere recebido).
-        #
-        # @return None
-        # ----------------------------------------------------------------------
+        """
+        ----------------------------------------------------------------------
+        @brief Escuta continuamente o buffer chamando uma função callback para cada novo caractere.
+
+        Essa função compara o buffer anterior com o atual e chama a função callback
+        passada pelo usuário a cada novo caractere recebido.
+
+        @param callback: Função que será chamada com um argumento (caractere recebido).
+
+        @return None
+        ----------------------------------------------------------------------
+        """
         try:
             ultimo_buffer = ""
             while True:
@@ -179,17 +186,19 @@ class Keyboard:
             print("\nKeyboard listening interrompido pelo usuário.")
 
 
-# ----------------------------------------------------------------------
-# @brief Função de conveniência para inicializar o teclado.
-#
-# Cria uma instância de Keyboard, inicia a leitura de eventos
-# e retorna o objeto para controle externo.
-#
-# @param device_path Caminho do dispositivo de teclado (ex: "/dev/input/event0").
-#
-# @return Instância de Keyboard pronta para uso.
-# ----------------------------------------------------------------------
 def start_keyboard(device_path):
+    """
+    ----------------------------------------------------------------------
+    @brief Função de conveniência para inicializar o teclado.
+
+    Cria uma instância de Keyboard, inicia a leitura de eventos
+    e retorna o objeto para controle externo.
+
+    @param device_path: Caminho do dispositivo de teclado (ex: "/dev/input/event0").
+
+    @return Instância de Keyboard pronta para uso.
+    ----------------------------------------------------------------------
+    """
     kb = Keyboard(device_path)
     kb.start()
     return kb
