@@ -41,7 +41,7 @@ def handle_ssid_selection(available_ssids):
             clear_buffer()
         elif buf.endswith("\x1b"):
             clear_buffer()
-            display_message("", "Atualizando lista...", "", "Aguarde...", "")
+            display_message("", "Atualizando lista...", "Aguarde...", "", "")
             selecting_ssid = False
         elif buf.endswith("\r"):
             selected_ssid = available_ssids[index]

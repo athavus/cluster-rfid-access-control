@@ -19,7 +19,7 @@ def run_system():
     ----------------------------------------------------------------------
     """
     try:
-        display_message("", "Inicializando...", "", "Sistema", "")
+        display_message("", "Inicializando...", "Sistema", "", "")
         time.sleep(1)
 
         while True:
