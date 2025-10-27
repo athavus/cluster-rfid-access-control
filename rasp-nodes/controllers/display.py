@@ -172,3 +172,46 @@ def draw_password_input(ssid, password, show_chars=False):
 
     disp.image(image)
     disp.show()
+
+
+def draw_password_roulette(ssid, password, charset, cursor_pos):
+    """
+    ----------------------------------------------------------------------
+    @brief Exibe a tela de entrada de senha no formato roleta de caracteres.
+
+    Permite ao usuário digitar a senha para conexão Wi-Fi selecionando
+    caracteres de um conjunto pré-definido, simulando uma "roleta" que
+    pode ser navegado com botões físicos.
+
+    Mostra o SSID atual, o campo de senha com caracteres ocultos,
+    a faixa de caracteres vizinhos à posição do cursor, e indicação 
+    visual do caractere atualmente selecionado.
+
+    @param ssid: String do nome da rede Wi-Fi atual.
+    @param password: String da senha digitada até o momento (simbolizada por asteriscos).
+    @param charset: String ou lista de caracteres disponíveis para seleção.
+    @param cursor_pos: Posição inteira atual na roleta de caracteres.
+
+    @return None
+    ----------------------------------------------------------------------
+    """
+    draw.rectangle((0, 0, width, height), outline=0, fill=0)
+    draw_centered_text(draw, "Conectar WiFi", 0, font=font_title)
+    draw.line((0, 12, width, 12), fill=255)
+
+    draw.text((2, 16), f"SSID: {ssid[:19]}", font=font_normal, fill=255)
+    display_pwd = "*" * len(password)
+    draw.text((2, 28), f"Senha: {display_pwd}", font=font_normal, fill=255)
+
+    # Exibe roleta de caracteres (posição atual centralizada)
+    start = max(cursor_pos - 2, 0)
+    end = min(cursor_pos + 3, len(charset))
+    chars_visiveis = [charset[i] for i in range(start, end)]
+    roleta = " ".join(chars_visiveis)
+    draw.text((2, 44), roleta, font=font_normal, fill=255)
+    setas_x = 2 + (cursor_pos - start) * 8
+    draw.text((setas_x, 54), "^", font=font_normal, fill=255)
+
+    disp.image(image)
+    disp.show()
+

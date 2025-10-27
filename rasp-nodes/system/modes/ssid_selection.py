@@ -1,21 +1,19 @@
 import time
 from controllers.display import draw_ssid_selection, display_message
-from controllers.keyboard import get_buffer, clear_buffer
+from controllers.buttons import read_button 
 from system.modes.password_input import handle_password_input
 
 def handle_ssid_selection(available_ssids):
     """
     ----------------------------------------------------------------------
-    @brief Gerencia a seleção de uma rede Wi-Fi disponível.
+    @brief Gerencia a seleção de rede Wi-Fi disponível via botões físicos.
 
-    Exibe uma lista de SSIDs disponíveis, permite navegação com
-    setas do teclado e seleção de rede via Enter.
-    ESC cancela a seleção ou atualiza a lista.
+    Exibe na tela uma lista de SSIDs disponíveis, permitindo ao usuário
+    navegar entre as opções usando botões de esquerda/direita e confirmar
+    com o botão OK. O SSID selecionado é destacado visualmente e passa
+    para a etapa de entrada de senha após confirmação.
 
-    Quando um SSID é selecionado, delega para handle_password_input
-    para captura de senha.
-
-    @param available_ssids: Lista de strings com os SSIDs disponíveis.
+    @param available_ssids: Lista de strings com as redes Wi-Fi detectadas.
 
     @return None
     ----------------------------------------------------------------------
@@ -30,21 +28,14 @@ def handle_ssid_selection(available_ssids):
             scroll_offset = index - 3
 
         draw_ssid_selection(available_ssids, index, scroll_offset)
-        time.sleep(0.1)
-        buf = get_buffer()
+        btn = read_button()
 
-        if buf.endswith("\x1b[A"):
+        if btn == 'left':
             index = (index - 1) % len(available_ssids)
-            clear_buffer()
-        elif buf.endswith("\x1b[B"):
+        elif btn == 'right':
             index = (index + 1) % len(available_ssids)
-            clear_buffer()
-        elif buf.endswith("\x1b"):
-            clear_buffer()
-            display_message("", "Atualizando lista...", "Aguarde...", "", "")
-            selecting_ssid = False
-        elif buf.endswith("\r"):
+        elif btn == 'ok':
             selected_ssid = available_ssids[index]
-            clear_buffer()
             handle_password_input(selected_ssid)
             selecting_ssid = False
+
