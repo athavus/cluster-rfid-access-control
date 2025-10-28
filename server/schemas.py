@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+import json
 
 class LEDCommand(BaseModel):
     status: str  # "ON" ou "OFF"
@@ -14,7 +15,7 @@ class LEDHistoryResponse(BaseModel):
     pin: int
     action: str
     timestamp: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -25,15 +26,23 @@ class DeviceStatusResponse(BaseModel):
     wifi_status: str
     mem_usage: str
     cpu_temp: str
+    cpu_percent: float
+    gpio_used_count: int
+    spi_buses: int
+    i2c_buses: int
+    usb_devices_count: int
+    net_bytes_sent: int
+    net_bytes_recv: int
+    net_ifaces: List[str]
     last_update: datetime
-    
-    class Config:
-        from_attributes = True
 
-class RaspberryMessage(BaseModel):
-    id: int
-    mem_usage: Optional[str] = None
-    wifi_status: Optional[str] = None
-    cpu_temp: Optional[str] = None
-    timestamp: float
+    class Config:
+        orm_mode = True
+
+    @classmethod
+    def from_orm(cls, obj):
+        # Convert net_ifaces JSON string to list
+        data = obj.__dict__.copy()
+        data['net_ifaces'] = json.loads(data.get('net_ifaces', '[]'))
+        return cls(**data)
 
