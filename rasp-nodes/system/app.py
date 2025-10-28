@@ -36,3 +36,4 @@ def run_system():
         from controllers.display import disp
         disp.fill(0)
         disp.show()
+
