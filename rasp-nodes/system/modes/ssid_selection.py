@@ -1,23 +1,9 @@
 import time
 from controllers.display import draw_ssid_selection, display_message
-from controllers.buttons import read_button 
+from controllers.buttons import read_button
 from system.modes.password_input import handle_password_input
 
 def handle_ssid_selection(available_ssids):
-    """
-    ----------------------------------------------------------------------
-    @brief Gerencia a seleção de rede Wi-Fi disponível via botões físicos.
-
-    Exibe na tela uma lista de SSIDs disponíveis, permitindo ao usuário
-    navegar entre as opções usando botões de esquerda/direita e confirmar
-    com o botão OK. O SSID selecionado é destacado visualmente e passa
-    para a etapa de entrada de senha após confirmação.
-
-    @param available_ssids: Lista de strings com as redes Wi-Fi detectadas.
-
-    @return None
-    ----------------------------------------------------------------------
-    """
     index, scroll_offset = 0, 0
     selecting_ssid = True
 

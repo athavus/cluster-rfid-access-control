@@ -1,35 +1,34 @@
 import RPi.GPIO as GPIO
 import time
 
-BUTTON_GPIO = {'left': 17, 'right': 27, 'ok': 22}
-
+BUTTON_GPIO = {'left': 23, 'right': 27, 'ok': 22}
 GPIO.setmode(GPIO.BCM)
+
 for pin in BUTTON_GPIO.values():
-    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# Controle de debounce mais robusto
+last_press_time = {'left': 0, 'right': 0, 'ok': 0}
+DEBOUNCE_TIME = 0.2  # 200ms entre pressionamentos
 
 def read_button():
     """
-    ----------------------------------------------------------------------
-    @brief Lê o estado dos botões físicos conectados aos pinos GPIO.
-
-    Verifica sequencialmente o estado dos pinos configurados para cada botão
-    (esquerda, direita e ok/confirmar), realizando debounce simples para evitar
-    múltiplas leituras por clique. Retorna o identificador do botão pressionado.
-
-    Os pinos devem estar previamente configurados no modo BCM e com pull-down.
-
-    @return
-        - 'left'   : Se o botão da esquerda foi pressionado.
-        - 'right'  : Se o botão da direita foi pressionado.
-        - 'ok'     : Se o botão de confirmação foi pressionado.
-        - None     : Se nenhum botão está pressionado.
-    ----------------------------------------------------------------------
+    Lê o estado dos botões com debounce aprimorado.
+    Retorna o nome do botão pressionado ou None.
     """
+    current_time = time.time()
+    
     for name, pin in BUTTON_GPIO.items():
-        if GPIO.input(pin) == GPIO.HIGH:
-            time.sleep(0.18)  # debounce simples
-            while GPIO.input(pin) == GPIO.HIGH:
-                pass  # aguarda soltar botão
-            return name
+        if GPIO.input(pin) == GPIO.LOW:
+            # Verifica se já passou tempo suficiente desde o último pressionamento
+            if current_time - last_press_time[name] > DEBOUNCE_TIME:
+                last_press_time[name] = current_time
+                
+                # Aguarda o botão ser solto
+                timeout = time.time() + 1.0  # timeout de 1 segundo
+                while GPIO.input(pin) == GPIO.LOW and time.time() < timeout:
+                    time.sleep(0.01)
+                
+                return name
+    
     return None
-

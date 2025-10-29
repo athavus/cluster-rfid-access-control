@@ -1,54 +1,193 @@
-import time
-from controllers.display import draw_password_roulette, display_message
+"""
+Modo de entrada de senha via roleta de caracteres.
+Interface intuitiva com navegação por botões.
+"""
+
+from controllers.display import draw_password_roulette, draw_connecting, draw_success, draw_error
 from controllers.buttons import read_button
-from controllers.wifi import connect_to_wifi
+import time
 
-CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789 !@#$%&*()-_=+,. ><"
+# Conjunto de caracteres disponíveis (ordem lógica)
+CHARSET = (
+    "abcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "0123456789"
+    "!@#$%&*()-_=+[]{}|;:',.<>?/\\ "
+    "~`^\""
+)
 
-def handle_password_input(selected_ssid):
+def handle_password_input(ssid, on_connect_callback=None):
     """
-    ----------------------------------------------------------------------
-    @brief Gerencia a entrada de senha usando roleta de caracteres
-           com botões físicos para conexão Wi-Fi.
+    Função principal para entrada de senha (compatibilidade com código existente).
+    
+    Parâmetros:
+    - ssid: Nome da rede WiFi
+    - on_connect_callback: Função chamada ao tentar conectar (ssid, password)
+    
+    Retorna:
+    - (success: bool, password: str ou None)
+    """
+    return password_input_mode(ssid, on_connect_callback)
 
-    O usuário navega pelo conjunto de caracteres disponível (letras, números,
-    símbolos) com botões de esquerda/direita, adicionando o caractere atual à senha
-    usando o botão OK. O caractere especial '>' finaliza/confirmar o envio,
-    e '<' apaga o último caractere digitado.
 
-    Exibe constantemente o SSID em uso, senha parcial e roleta centralizada
-    no display, até o usuário completar ou cancelar a operação.
+def password_input_mode(ssid, on_connect_callback=None):
+    """
+    Modo de entrada de senha com navegação por roleta.
+    
+    Parâmetros:
+    - ssid: Nome da rede WiFi
+    - on_connect_callback: Função chamada ao tentar conectar (ssid, password)
+    
+    Retorna:
+    - (success: bool, password: str ou None)
+    """
+    password = ""
+    cursor_pos = 0  # Posição na roleta de caracteres
+    last_update = time.time()
+    
+    # Desenha interface inicial
+    draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+    
+    while True:
+        # Lê botão
+        button = read_button()
+        
+        if button:
+            current_time = time.time()
+            
+            if button == 'left':
+                # Navega para esquerda na roleta
+                cursor_pos = (cursor_pos - 1) % len(CHARSET)
+                draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                
+            elif button == 'right':
+                # Navega para direita na roleta
+                cursor_pos = (cursor_pos + 1) % len(CHARSET)
+                draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                
+            elif button == 'ok':
+                # Comportamentos diferentes dependendo do contexto
+                current_char = CHARSET[cursor_pos]
+                
+                # Se senha está vazia e caractere é espaço, cancela
+                if len(password) == 0 and current_char == ' ':
+                    return (False, None)
+                
+                # Se senha tem conteúdo e caractere é espaço, tenta conectar
+                if len(password) > 0 and current_char == ' ':
+                    # Confirma conexão
+                    draw_connecting(ssid)
+                    
+                    if on_connect_callback:
+                        success, message = on_connect_callback(ssid, password)
+                        
+                        if success:
+                            draw_success(ssid, message)
+                            time.sleep(2)
+                            return (True, password)
+                        else:
+                            draw_error(message)
+                            time.sleep(2)
+                            # Volta para edição
+                            draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                    else:
+                        # Modo teste - sempre sucesso
+                        return (True, password)
+                
+                # Senão, adiciona caractere à senha
+                else:
+                    password += current_char
+                    draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+            
+            last_update = current_time
+        
+        # Pequena pausa para não sobrecarregar CPU
+        time.sleep(0.05)
 
-    @param selected_ssid: String do SSID da rede escolhida.
 
-    @return None
-    ----------------------------------------------------------------------
+def password_input_mode_backspace(ssid, on_connect_callback=None):
+    """
+    Modo alternativo com backspace explícito.
+    Pressionar OK em espaço vazio = backspace.
+    Pressionar OK duas vezes rápido = submeter senha.
     """
     password = ""
     cursor_pos = 0
-    entering_password = True
+    last_ok_press = 0
+    double_click_threshold = 0.5  # 500ms para duplo clique
+    
+    draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+    
+    while True:
+        button = read_button()
+        
+        if button:
+            current_time = time.time()
+            
+            if button == 'left':
+                cursor_pos = (cursor_pos - 1) % len(CHARSET)
+                draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                
+            elif button == 'right':
+                cursor_pos = (cursor_pos + 1) % len(CHARSET)
+                draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                
+            elif button == 'ok':
+                current_char = CHARSET[cursor_pos]
+                
+                # Verifica duplo clique
+                time_since_last_ok = current_time - last_ok_press
+                
+                if time_since_last_ok < double_click_threshold and len(password) > 0:
+                    # Duplo clique = submeter senha
+                    draw_connecting(ssid)
+                    
+                    if on_connect_callback:
+                        success, message = on_connect_callback(ssid, password)
+                        
+                        if success:
+                            draw_success(ssid, message)
+                            time.sleep(2)
+                            return (True, password)
+                        else:
+                            draw_error(message)
+                            time.sleep(2)
+                            draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                    else:
+                        return (True, password)
+                
+                # Espaço vazio = backspace
+                elif current_char == ' ' and len(password) > 0:
+                    password = password[:-1]
+                    draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                
+                # Cancelar (espaço sem senha)
+                elif current_char == ' ' and len(password) == 0:
+                    return (False, None)
+                
+                # Adiciona caractere
+                else:
+                    password += current_char
+                    draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                
+                last_ok_press = current_time
+        
+        time.sleep(0.05)
 
-    while entering_password:
-        draw_password_roulette(selected_ssid, password, CHARSET, cursor_pos)
-        btn = read_button()
 
-        if btn == 'left':
-            cursor_pos = (cursor_pos - 1) % len(CHARSET)
-        elif btn == 'right':
-            cursor_pos = (cursor_pos + 1) % len(CHARSET)
-        elif btn == 'ok':
-            char = CHARSET[cursor_pos]
-            if char == '>':
-                success = connect_to_wifi(selected_ssid, password)
-                display_message("",
-                                "Conectado!" if success else "Falha na conexao!",
-                                "",
-                                f"SSID: {selected_ssid[:19]}",
-                                "" if success else "Tente novamente...")
-                time.sleep(1)
-                entering_password = False
-            elif char == '<':
-                password = password[:-1]
-            else:
-                password += char
-
+# Exemplo de uso
+if __name__ == "__main__":
+    def mock_connect(ssid, pwd):
+        """Simula tentativa de conexão."""
+        print(f"Conectando em '{ssid}' com senha '{pwd}'")
+        time.sleep(1)
+        
+        # Simula sucesso se senha tem mais de 5 caracteres
+        if len(pwd) >= 5:
+            return (True, "192.168.1.100")
+        else:
+            return (False, "Senha muito curta")
+    
+    # Teste do modo principal
+    success, password = handle_password_input("MinhaRedeWiFi", mock_connect)
+    print(f"Resultado: success={success}, password='{password}'")

@@ -5,12 +5,12 @@ import json
 
 class LEDCommand(BaseModel):
     status: str
-    raspberry_id: Optional[str] = "unknown"  # agora string
+    raspberry_id: Optional[int] = 1
     led_type: Optional[str] = "external"
 
 class LEDHistoryResponse(BaseModel):
     id: int
-    raspberry_id: str  # string aqui
+    raspberry_id: int
     led_type: str
     pin: int
     action: str

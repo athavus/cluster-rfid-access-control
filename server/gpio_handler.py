@@ -1,6 +1,5 @@
 """
 Manipulador de GPIO para Raspberry Pi 5
-Usa rpi-lgpio em vez de RPi.GPIO
 """
 
 try:

@@ -14,7 +14,7 @@ class LEDHistory(Base):
     __tablename__ = "led_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    raspberry_id = Column(String, index=True)  # Alterado para String
+    raspberry_id = Column(Integer, index=True) 
     led_type = Column(String)
     pin = Column(Integer)
     action = Column(String)
