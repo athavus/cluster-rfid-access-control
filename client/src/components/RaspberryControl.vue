@@ -1,11 +1,11 @@
 <template>
   <div class="raspberry-control">
-    <h1>🍓 Raspberry Pi LED Control</h1>
+    <h1>Raspberry Pi LED Control</h1>
 
     <!-- Health Status -->
     <div class="health-section">
       <h2>System Health</h2>
-      <button @click="fetchHealth">🔄 Refresh Health</button>
+      <button @click="fetchHealth">Refresh Health</button>
       <div v-if="health" class="health-info">
         <div class="health-item">
           <strong>API:</strong> {{ health.api }}
@@ -64,14 +64,14 @@
       </div>
 
       <button @click="fetchLEDStatus" class="btn-refresh">
-        🔄 Refresh Status
+        Refresh Status
       </button>
     </div>
 
     <!-- Statistics -->
     <div class="stats-section">
       <h2>Statistics</h2>
-      <button @click="fetchStats">📊 Load Stats</button>
+      <button @click="fetchStats">Load Stats</button>
       <div v-if="stats" class="stats-grid">
         <div class="stat-card">
           <div class="stat-value">{{ stats.total_devices }}</div>
@@ -95,7 +95,7 @@
     <!-- LED History -->
     <div class="history-section">
       <h2>LED History</h2>
-      <button @click="fetchHistory">📜 Load History</button>
+      <button @click="fetchHistory">Load History</button>
       <div v-if="history.length > 0" class="history-list">
         <div v-for="item in history" :key="item.id" class="history-item">
           <span class="history-time">{{ formatDate(item.timestamp) }}</span>
@@ -107,155 +107,97 @@
     </div>
 
     <!-- Loading & Error States -->
-    <div v-if="loading" class="loading">⏳ Loading...</div>
-    <div v-if="error" class="error">❌ {{ error }}</div>
+    <div v-if="loading" class="loading">Loading...</div>
+    <div v-if="error" class="error">
+      ❌ {{ error }}
+      <button @click="error = null" style="margin-left: 10px; padding: 5px 10px;">✕</button>
+    </div>
   </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue';
+import { ledService, healthService } from '@/services/raspberryApi';
 
 export default {
   name: 'RaspberryControl',
   setup() {
     const loading = ref(false);
     const error = ref(null);
-    
-    // Dados mockados
-    const health = ref({
-      api: 'healthy',
-      database: 'connected',
-      gpio: 'available',
-      registered_devices: 3
-    });
-    
-    const ledStatus = ref({
-      raspberry_id: 1,
-      led_internal: 'ON',
-      led_external: 'OFF',
-      last_update: new Date().toISOString()
-    });
-    
-    const stats = ref({
-      total_devices: 3,
-      total_led_actions: 1247,
-      led_actions_24h: 89,
-      realtime_messages: 342
-    });
-    
-    const history = ref([
-      {
-        id: 1,
-        raspberry_id: 1,
-        led_type: 'internal',
-        action: 'ON',
-        timestamp: new Date().toISOString()
-      },
-      {
-        id: 2,
-        raspberry_id: 1,
-        led_type: 'external',
-        action: 'OFF',
-        timestamp: new Date(Date.now() - 60000).toISOString()
-      },
-      {
-        id: 3,
-        raspberry_id: 2,
-        led_type: 'internal',
-        action: 'ON',
-        timestamp: new Date(Date.now() - 120000).toISOString()
-      },
-      {
-        id: 4,
-        raspberry_id: 1,
-        led_type: 'internal',
-        action: 'OFF',
-        timestamp: new Date(Date.now() - 180000).toISOString()
-      },
-      {
-        id: 5,
-        raspberry_id: 3,
-        led_type: 'external',
-        action: 'ON',
-        timestamp: new Date(Date.now() - 240000).toISOString()
-      }
-    ]);
+    const health = ref(null);
+    const ledStatus = ref(null);
+    const stats = ref(null);
+    const history = ref([]);
 
-    // Simular controle de LED
+    // Controlar LED
     const toggleLED = async (ledType, status) => {
       loading.value = true;
       error.value = null;
-      
-      // Simular delay da API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       try {
-        // Atualizar status
-        if (ledType === 'internal') {
-          ledStatus.value.led_internal = status;
-        } else {
-          ledStatus.value.led_external = status;
-        }
-        
-        // Adicionar ao histórico
-        history.value.unshift({
-          id: history.value.length + 1,
-          raspberry_id: 1,
-          led_type: ledType,
-          action: status,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Atualizar estatísticas
-        stats.value.total_led_actions++;
-        stats.value.led_actions_24h++;
-        
-        console.log(`LED ${ledType} ${status}`);
+        const result = await ledService.controlLED(1, ledType, status);
+        console.log('LED controlado:', result);
+        await fetchLEDStatus(); // Atualizar status após controlar
       } catch (err) {
-        error.value = 'Erro ao controlar LED';
+        error.value = err.response?.data?.detail || err.message;
+        console.error('❌ Erro ao controlar LED:', err);
       } finally {
         loading.value = false;
       }
     };
 
-    // Simular buscar status dos LEDs
+    // Buscar status dos LEDs
     const fetchLEDStatus = async () => {
-      loading.value = true;
-      await new Promise(resolve => setTimeout(resolve, 300));
-      console.log('Status atualizado:', ledStatus.value);
-      loading.value = false;
+      try {
+        ledStatus.value = await ledService.getStatus(1);
+        console.log('Status LED atualizado:', ledStatus.value);
+      } catch (err) {
+        console.error('❌ Erro ao buscar status:', err);
+      }
     };
 
-    // Simular buscar health
+    // Buscar health
     const fetchHealth = async () => {
       loading.value = true;
-      await new Promise(resolve => setTimeout(resolve, 300));
-      console.log('Health check:', health.value);
-      loading.value = false;
+      error.value = null;
+      try {
+        health.value = await healthService.checkHealth();
+        console.log('Health check:', health.value);
+      } catch (err) {
+        error.value = err.message;
+        console.error('❌ Erro no health check:', err);
+      } finally {
+        loading.value = false;
+      }
     };
 
-    // Simular buscar estatísticas
+    // Buscar estatísticas
     const fetchStats = async () => {
       loading.value = true;
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      // Simular mudança nos dados
-      stats.value = {
-        total_devices: Math.floor(Math.random() * 5) + 1,
-        total_led_actions: Math.floor(Math.random() * 2000) + 1000,
-        led_actions_24h: Math.floor(Math.random() * 150) + 50,
-        realtime_messages: Math.floor(Math.random() * 500) + 200
-      };
-      
-      loading.value = false;
+      error.value = null;
+      try {
+        stats.value = await healthService.getStats();
+        console.log('Stats carregadas:', stats.value);
+      } catch (err) {
+        error.value = err.message;
+        console.error('❌ Erro ao carregar stats:', err);
+      } finally {
+        loading.value = false;
+      }
     };
 
-    // Simular buscar histórico
+    // Buscar histórico
     const fetchHistory = async () => {
       loading.value = true;
-      await new Promise(resolve => setTimeout(resolve, 400));
-      console.log('Histórico carregado:', history.value.length, 'itens');
-      loading.value = false;
+      error.value = null;
+      try {
+        history.value = await ledService.getHistory(null, null, 20);
+        console.log('Histórico carregado:', history.value.length, 'itens');
+      } catch (err) {
+        error.value = err.message;
+        console.error('❌ Erro ao carregar histórico:', err);
+      } finally {
+        loading.value = false;
+      }
     };
 
     // Formatar data
@@ -264,10 +206,12 @@ export default {
       return date.toLocaleString('pt-BR');
     };
 
-    // Carregar dados iniciais (já estão mockados)
+    // Carregar dados iniciais
     onMounted(() => {
-      console.log('🍓 Componente montado com dados mockados');
-      console.log('👉 Todos os botões funcionam e simulam interações com a API');
+      console.log('Componente montado - Carregando dados da API...');
+      fetchHealth();
+      fetchLEDStatus();
+      fetchStats();
     });
 
     return {
@@ -522,5 +466,8 @@ button {
   border-radius: 5px;
   margin: 20px 0;
   border: 1px solid #f5c6cb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>
