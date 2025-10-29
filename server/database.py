@@ -1,53 +1,49 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional, List
 import json
 
-# Configuração do banco SQLite
-DATABASE_URL = "sqlite:///./raspberry_data.db"
+class LEDCommand(BaseModel):
+    status: str  # "ON" ou "OFF"
+    raspberry_id: Optional[int] = 1
+    led_type: Optional[str] = "external"  # "internal" ou "external"
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+class LEDHistoryResponse(BaseModel):
+    id: int
+    raspberry_id: int
+    led_type: str
+    pin: int
+    action: str
+    timestamp: datetime
 
-class LEDHistory(Base):
-    __tablename__ = "led_history"
+    class Config:
+        from_attributes = True
 
-    id = Column(Integer, primary_key=True, index=True)
-    raspberry_id = Column(Integer, index=True)
-    led_type = Column(String)  # "internal" ou "external"
-    pin = Column(Integer)
-    action = Column(String)  # "ON" ou "OFF"
-    timestamp = Column(DateTime, default=datetime.utcnow)
+class DeviceStatusResponse(BaseModel):
+    raspberry_id: int
+    led_internal_status: bool
+    led_external_status: bool
+    wifi_status: str
+    mem_usage: str
+    cpu_temp: str
+    cpu_percent: float
+    gpio_used_count: int
+    spi_buses: int
+    i2c_buses: int
+    usb_devices_count: int
+    net_bytes_sent: int
+    net_bytes_recv: int
+    net_ifaces: List[str]
+    last_update: datetime
 
-class DeviceStatus(Base):
-    __tablename__ = "device_status"
+    class Config:
+        orm_mode = True
 
-    id = Column(Integer, primary_key=True, index=True)
-    raspberry_id = Column(Integer, unique=True, index=True)
-    led_internal_status = Column(Boolean, default=False)
-    led_external_status = Column(Boolean, default=False)
-    wifi_status = Column(String, default="unknown")
-    mem_usage = Column(String, default="0 MB")
-    cpu_temp = Column(String, default="0°C")
-    cpu_percent = Column(Float, default=0.0)
-    gpio_used_count = Column(Integer, default=0)
-    spi_buses = Column(Integer, default=0)
-    i2c_buses = Column(Integer, default=0)
-    usb_devices_count = Column(Integer, default=0)
-    net_bytes_sent = Column(Integer, default=0)
-    net_bytes_recv = Column(Integer, default=0)
-    net_ifaces = Column(Text, default="[]")  # JSON string
-    last_update = Column(DateTime, default=datetime.utcnow)
+    @classmethod
+    def from_orm(cls, obj):
+        # Convert net_ifaces JSON string to list
+        data = obj.__dict__.copy()
+        data['net_ifaces'] = json.loads(data.get('net_ifaces', '[]'))
+        return cls(**data)
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 

@@ -4,13 +4,13 @@ from typing import Optional, List
 import json
 
 class LEDCommand(BaseModel):
-    status: str  # "ON" ou "OFF"
-    raspberry_id: Optional[int] = 1
-    led_type: Optional[str] = "external"  # "internal" ou "external"
+    status: str
+    raspberry_id: Optional[str] = "unknown"  # agora string
+    led_type: Optional[str] = "external"
 
 class LEDHistoryResponse(BaseModel):
     id: int
-    raspberry_id: int
+    raspberry_id: str  # string aqui
     led_type: str
     pin: int
     action: str
@@ -20,7 +20,7 @@ class LEDHistoryResponse(BaseModel):
         from_attributes = True
 
 class DeviceStatusResponse(BaseModel):
-    raspberry_id: int
+    raspberry_id: str  # string
     led_internal_status: bool
     led_external_status: bool
     wifi_status: str
@@ -41,7 +41,6 @@ class DeviceStatusResponse(BaseModel):
 
     @classmethod
     def from_orm(cls, obj):
-        # Convert net_ifaces JSON string to list
         data = obj.__dict__.copy()
         data['net_ifaces'] = json.loads(data.get('net_ifaces', '[]'))
         return cls(**data)

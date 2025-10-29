@@ -4,6 +4,7 @@ import time
 import psutil  # pip install psutil
 import os
 from glob import glob
+import socket  # para hostname único
 
 def get_system_info():
     """Coleta informações do sistema ampliadas"""
@@ -21,11 +22,9 @@ def get_system_info():
 
         wifi_status = "online" if psutil.net_if_stats().get("wlan0") else "unknown"
 
-        # SPI e I2C buses
         spi_buses = len(glob('/dev/spidev*'))
         i2c_buses = len(glob('/dev/i2c-*'))
 
-        # USB devices conectados
         usb_devices_count = len(glob('/sys/bus/usb/devices/*usb*'))
 
         net_io = psutil.net_io_counters()
@@ -34,7 +33,6 @@ def get_system_info():
 
         net_ifaces = [iface for iface, addrs in psutil.net_if_addrs().items() if psutil.net_if_stats()[iface].isup]
 
-        # Para GPIO usado, vamos deixar 0 (você pode melhorar conforme hardware)
         gpio_used_count = 0
 
         return {
@@ -71,13 +69,13 @@ def publish_health_data():
     try:
         credentials = pika.PlainCredentials('athavus', '1234')
         connection = pika.BlockingConnection(
-            pika.ConnectionParameters('localhost', 5672, '/', credentials, heartbeat=600)
+            pika.ConnectionParameters('192.168.130.9', 5672, '/', credentials, heartbeat=600)
         )
         channel = connection.channel()
         channel.queue_declare(queue='rasp_data', durable=True)
 
         cont_messages = 0
-        raspberry_id = 1
+        raspberry_id = socket.gethostname()  # ID dinâmico pelo hostname
 
         print(f"Iniciando publicação ampliada de health check para Raspberry {raspberry_id}")
         print("Pressione CTRL+C para parar\n")
@@ -104,7 +102,7 @@ def publish_health_data():
                 print(f"[{time.strftime('%H:%M:%S')}] Rasp {raspberry_id}: {data}")
 
                 cont_messages += 1
-                time.sleep(0.01)  # Envia a cada 10 ms
+                time.sleep(0.01)  # Envio a cada 10 ms
 
             except KeyboardInterrupt:
                 print("\nParando publicador...")
