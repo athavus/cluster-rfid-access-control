@@ -55,29 +55,31 @@ export const ledService = {
     const response = await api.get('/api/led/status', {
       params: { raspberry_id: raspberryId }
     });
-    return response.data;
+    return response.data; // Deve retornar o status dos LEDs internos e externos
   },
 
   // Buscar histórico de ações dos LEDs
   getHistory: async (raspberryId = null, ledType = null, limit = 50) => {
     const params = { limit };
-    if (raspberryId) params.raspberry_id = raspberryId;
-    if (ledType) params.led_type = ledType;
-    
+    if (raspberryId !== null) params.raspberry_id = raspberryId;
+    if (ledType !== null) params.led_type = ledType;
+
     const response = await api.get('/api/led/history', { params });
+    // mapeando o datetime para o formato desejado, se necessário
     return response.data;
   }
 };
 
-// ============= SERVIÇOS DE DEVICE STATUS =============
+// ============= SERVIÇOS DE STATUS DOS DISPOSITIVOS =============
 export const deviceService = {
   // Buscar status de todos os dispositivos
   getAllDevices: async () => {
     const response = await api.get('/api/devices/status');
+    // Espera-se que raspberry_id seja string, conforme modelo!
     return response.data;
   },
 
-  // Buscar status de um dispositivo específico
+  // Buscar status de um dispositivo específico (por id string)
   getDevice: async (raspberryId) => {
     const response = await api.get(`/api/devices/${raspberryId}/status`);
     return response.data;
@@ -94,7 +96,7 @@ export const realtimeService = {
     return response.data;
   },
 
-  // Enviar dados
+  // Enviar dados manualmente (para testes/debug)
   postData: async (data) => {
     const response = await api.post('/api/data', data);
     return response.data;
@@ -103,13 +105,13 @@ export const realtimeService = {
 
 // ============= SERVIÇOS DE HEALTH CHECK =============
 export const healthService = {
-  // Root endpoint
+  // Root endpoint (info da API)
   getRoot: async () => {
     const response = await api.get('/');
     return response.data;
   },
 
-  // Health check
+  // Health check completo
   checkHealth: async () => {
     const response = await api.get('/health');
     return response.data;
@@ -123,3 +125,4 @@ export const healthService = {
 };
 
 export default api;
+

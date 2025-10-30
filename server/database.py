@@ -2,7 +2,6 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
-import json
 
 DATABASE_URL = "sqlite:///./raspberry_data.db"
 
@@ -14,7 +13,7 @@ class LEDHistory(Base):
     __tablename__ = "led_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    raspberry_id = Column(Integer, index=True) 
+    raspberry_id = Column(String, index=True)  # agora string
     led_type = Column(String)
     pin = Column(Integer)
     action = Column(String)
@@ -24,7 +23,7 @@ class DeviceStatus(Base):
     __tablename__ = "device_status"
 
     id = Column(Integer, primary_key=True, index=True)
-    raspberry_id = Column(String, unique=True, index=True)  # Alterado para String
+    raspberry_id = Column(String, unique=True, index=True)  # string para o hostname
     led_internal_status = Column(Boolean, default=False)
     led_external_status = Column(Boolean, default=False)
     wifi_status = Column(String, default="unknown")
