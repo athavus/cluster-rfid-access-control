@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Configuração base da API
 const api = axios.create({
-  baseURL: 'http://localhost:8000', // Endereço do FastAPI
+  baseURL: 'http://192.168.130.9:8000', // Endereço do FastAPI
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
