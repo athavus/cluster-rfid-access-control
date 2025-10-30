@@ -36,20 +36,11 @@ app = FastAPI(
     version="3.0.0"
 )
 
-origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://localhost:8080",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8080",
-    "http://192.168.130.9:5173"
-]
-
+# CORS amplo para permitir controle entre placas (ambiente local)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"]
 )
@@ -68,13 +59,23 @@ def control_led(command: LEDCommand, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="status deve ser 'ON' ou 'OFF'")
     
     # Usa o pino fornecido caso exista; senão, usa o padrão por tipo
-    pin = command.pin if command.pin is not None else GPIOController.get_pin(led_type)
+    try:
+        pin_to_use = int(command.pin) if command.pin is not None else GPIOController.get_pin(led_type)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Pino inválido")
+
+    if pin_to_use < 0 or pin_to_use > 40:
+        raise HTTPException(status_code=400, detail="Pino fora do intervalo permitido")
+
     led_state = command.status.upper() == "ON"
-    
-    success = GPIOController.set_led(pin, led_state)
-    
+
+    try:
+        success = GPIOController.set_led(pin_to_use, led_state)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Falha no GPIO: {str(e)}")
+
     if not success:
-        raise HTTPException(status_code=500, detail="Erro ao controlar LED")
+        raise HTTPException(status_code=500, detail="Erro ao controlar LED (GPIO retornou falso)")
     
     device = db.query(DeviceStatus).filter(DeviceStatus.raspberry_id == raspberry_id).first()
     
@@ -95,7 +96,7 @@ def control_led(command: LEDCommand, db: Session = Depends(get_db)):
     history = LEDHistory(
         raspberry_id=raspberry_id,
         led_type=led_type,
-        pin=pin,
+        pin=pin_to_use,
         action=command.status.upper()
     )
     
@@ -106,7 +107,7 @@ def control_led(command: LEDCommand, db: Session = Depends(get_db)):
         "message": f"LED {led_type} {'ligado' if led_state else 'desligado'}",
         "raspberry_id": raspberry_id,
         "led_type": led_type,
-        "pin": pin,
+        "pin": pin_to_use,
         "status": command.status.upper(),
         "gpio_available": GPIO_AVAILABLE,
         "timestamp": datetime.utcnow()
@@ -450,5 +451,6 @@ def shutdown_event():
     print("Desligando API...")
     GPIOController.cleanup()
     cleanup_rfid()
+
 
 

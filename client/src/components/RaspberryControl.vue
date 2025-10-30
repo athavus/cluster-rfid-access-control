@@ -62,6 +62,16 @@
             />
           </div>
 
+          <div class="mt-3">
+            <label class="block text-sm text-green-900 mb-1">IP do dispositivo alvo (ex.: 192.168.130.166)</label>
+            <input
+              type="text"
+              class="w-64 px-2 py-1 border rounded"
+              placeholder="192.168.130.166"
+              v-model.trim="targetHost"
+            />
+          </div>
+
           <div class="mt-4 flex gap-4">
             <button
               @click="toggleLED('ON')"
@@ -156,6 +166,7 @@ export default {
     const selectedDeviceDetails = ref(null);
     const realtimeMessages = ref([]);
     const externalLedPin = ref(17);
+    const targetHost = ref('');
 
     let refreshTimer = null;
 
@@ -256,10 +267,11 @@ export default {
       loading.value = true;
       error.value = null;
       try {
+        const host = targetHost.value && targetHost.value.length > 0 ? targetHost.value : null;
         if (status === 'ON') {
-          await ledService.turnOn('external', selectedDeviceId.value, externalLedPin.value);
+          await ledService.turnOn('external', selectedDeviceId.value, externalLedPin.value, host);
         } else {
-          await ledService.turnOff('external', selectedDeviceId.value, externalLedPin.value);
+          await ledService.turnOff('external', selectedDeviceId.value, externalLedPin.value, host);
         }
         await fetchDeviceDetails(selectedDeviceId.value);
       } catch (err) {
@@ -291,6 +303,7 @@ export default {
       selectedDeviceDetails,
       realtimeMessages,
       externalLedPin,
+      targetHost,
       filteredRealtimeMessages,
       fetchAllData,
       selectDevice,
@@ -331,3 +344,4 @@ button {
   width: 100%;
 }
 </style>
+
