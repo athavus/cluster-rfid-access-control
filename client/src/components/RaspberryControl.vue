@@ -139,19 +139,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Real-time Messages -->
-        <div class="mt-6 overflow-auto max-h-64 bg-gray-50 p-4 rounded-md border border-gray-200">
-          <h3 class="font-semibold mb-3">Mensagens em tempo real (últimas 50)</h3>
-          <div v-if="filteredRealtimeMessages.length === 0" class="text-gray-500 text-sm">
-            Nenhuma mensagem recente para este dispositivo.
-          </div>
-          <ul v-else class="space-y-2 text-xs font-mono text-gray-700">
-            <li v-for="(msg, idx) in filteredRealtimeMessages" :key="idx" class="whitespace-pre-wrap break-all bg-white p-2 rounded shadow-sm">
-              {{ stringifyMessage(msg) }}
-            </li>
-          </ul>
-        </div>
       </section>
 
       <!-- Loading and Errors -->
