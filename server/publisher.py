@@ -109,7 +109,7 @@ def publish_health_data():
                 break
             except Exception as e:
                 print(f"Erro: {e}")
-                time.sleep(0.01)
+                time.sleep(1)
 
         connection.close()
         return cont_messages
