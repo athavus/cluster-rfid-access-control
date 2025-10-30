@@ -40,6 +40,16 @@
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Error Message -->
+      <div v-if="error" class="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+        <span class="text-2xl">⚠️</span>
+        <div>
+          <h3 class="font-semibold text-red-900">Erro de Conexão</h3>
+          <p class="text-sm text-red-700">{{ error }}</p>
+        </div>
+        <button @click="error = null" class="ml-auto text-red-500 hover:text-red-700">✕</button>
+      </div>
+
       <!-- Stats Row -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
@@ -207,26 +217,35 @@
           <div class="p-6 space-y-3">
             <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <span class="text-sm font-medium text-gray-600">API Status</span>
-              <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+              <span :class="[
+                'px-3 py-1 text-xs font-bold rounded-full',
+                health.api === 'healthy' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              ]">
                 {{ health.api }}
               </span>
             </div>
             <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <span class="text-sm font-medium text-gray-600">Database</span>
-              <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+              <span :class="[
+                'px-3 py-1 text-xs font-bold rounded-full',
+                health.database === 'connected' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              ]">
                 {{ health.database }}
               </span>
             </div>
             <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
               <span class="text-sm font-medium text-gray-600">GPIO</span>
-              <span class="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full">
+              <span :class="[
+                'px-3 py-1 text-xs font-bold rounded-full',
+                health.gpio === 'available' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+              ]">
                 {{ health.gpio }}
               </span>
             </div>
             <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <span class="text-sm font-medium text-gray-600">RabbitMQ</span>
-              <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                running
+              <span class="text-sm font-medium text-gray-600">Devices</span>
+              <span class="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+                {{ health.registered_devices }}
               </span>
             </div>
           </div>
@@ -238,7 +257,10 @@
             <h2 class="text-xl font-bold text-gray-900">Recent Activity</h2>
           </div>
           <div class="p-6">
-            <div class="space-y-3 max-h-80 overflow-y-auto">
+            <div v-if="history.length === 0" class="text-center text-gray-500 py-8">
+              No activity yet
+            </div>
+            <div v-else class="space-y-3 max-h-80 overflow-y-auto">
               <div 
                 v-for="item in history.slice(0, 6)" 
                 :key="item.id"
@@ -316,7 +338,8 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue';
+import { ledService, deviceService, healthService, realtimeService } from '../services/raspberryApi.js';
 
 export default {
   name: 'RaspberryControl',
@@ -324,80 +347,151 @@ export default {
     const loading = ref(false);
     const isOnline = ref(true);
     const chartCanvas = ref(null);
+    const currentRaspberryId = ref(1);
+    const error = ref(null);
+    let statusInterval = null;
+    let historyInterval = null;
     
     const health = ref({
-      api: 'healthy',
-      database: 'connected',
-      gpio: 'available',
-      registered_devices: 3
+      api: 'loading...',
+      database: 'loading...',
+      gpio: 'loading...',
+      registered_devices: 0
     });
     
     const ledStatus = ref({
       raspberry_id: 1,
-      led_internal: 'ON',
+      led_internal: 'OFF',
       led_external: 'OFF',
-      last_update: new Date().toISOString()
+      last_update: null
     });
     
     const stats = ref({
-      total_devices: 3,
-      total_led_actions: 1247,
-      led_actions_24h: 89,
-      realtime_messages: 342
+      total_devices: 0,
+      total_led_actions: 0,
+      led_actions_24h: 0,
+      realtime_messages: 0
     });
     
-    const history = ref([
-      { id: 1, raspberry_id: 1, led_type: 'internal', action: 'ON', timestamp: new Date().toISOString() },
-      { id: 2, raspberry_id: 1, led_type: 'external', action: 'OFF', timestamp: new Date(Date.now() - 60000).toISOString() },
-      { id: 3, raspberry_id: 2, led_type: 'internal', action: 'ON', timestamp: new Date(Date.now() - 120000).toISOString() },
-      { id: 4, raspberry_id: 1, led_type: 'internal', action: 'OFF', timestamp: new Date(Date.now() - 180000).toISOString() },
-      { id: 5, raspberry_id: 3, led_type: 'external', action: 'ON', timestamp: new Date(Date.now() - 240000).toISOString() },
-      { id: 6, raspberry_id: 1, led_type: 'external', action: 'ON', timestamp: new Date(Date.now() - 300000).toISOString() },
-    ]);
+    const history = ref([]);
 
     const toggleLED = async (ledType, status) => {
       loading.value = true;
-      await new Promise(resolve => setTimeout(resolve, 400));
+      error.value = null;
       
-      if (ledType === 'internal') {
-        ledStatus.value.led_internal = status;
-      } else {
-        ledStatus.value.led_external = status;
+      try {
+        if (status === 'ON') {
+          await ledService.turnOn(ledType, currentRaspberryId.value);
+        } else {
+          await ledService.turnOff(ledType, currentRaspberryId.value);
+        }
+        
+        // Atualiza o status local
+        if (ledType === 'internal') {
+          ledStatus.value.led_internal = status;
+        } else {
+          ledStatus.value.led_external = status;
+        }
+        
+        // Recarrega dados
+        await Promise.all([
+          fetchLEDStatus(),
+          fetchHistory(),
+          fetchStats()
+        ]);
+      } catch (err) {
+        console.error('Erro ao controlar LED:', err);
+        error.value = `Erro ao ${status === 'ON' ? 'ligar' : 'desligar'} LED ${ledType}`;
+        isOnline.value = false;
+      } finally {
+        loading.value = false;
       }
-      
-      history.value.unshift({
-        id: history.value.length + 1,
-        raspberry_id: 1,
-        led_type: ledType,
-        action: status,
-        timestamp: new Date().toISOString()
-      });
-      
-      stats.value.total_led_actions++;
-      stats.value.led_actions_24h++;
-      
-      loading.value = false;
     };
 
     const fetchLEDStatus = async () => {
-      loading.value = true;
-      await new Promise(resolve => setTimeout(resolve, 300));
-      loading.value = false;
+      try {
+        const data = await ledService.getStatus(currentRaspberryId.value);
+        ledStatus.value = {
+          raspberry_id: data.raspberry_id,
+          led_internal: data.led_internal,
+          led_external: data.led_external,
+          last_update: data.last_update
+        };
+        isOnline.value = true;
+      } catch (err) {
+        console.error('Erro ao buscar status dos LEDs:', err);
+        isOnline.value = false;
+      }
     };
 
     const fetchHistory = async () => {
-      loading.value = true;
-      await new Promise(resolve => setTimeout(resolve, 400));
-      loading.value = false;
+      try {
+        const data = await ledService.getHistory(null, null, 50);
+        history.value = data;
+        await nextTick();
+        drawChart();
+      } catch (err) {
+        console.error('Erro ao buscar histórico:', err);
+      }
+    };
+
+    const fetchHealth = async () => {
+      try {
+        const data = await healthService.checkHealth();
+        health.value = {
+          api: data.status || 'healthy',
+          database: data.database || 'connected',
+          gpio: data.gpio || 'available',
+          registered_devices: data.registered_devices || 0
+        };
+      } catch (err) {
+        console.error('Erro ao buscar health:', err);
+        health.value = {
+          api: 'error',
+          database: 'error',
+          gpio: 'error',
+          registered_devices: 0
+        };
+      }
+    };
+
+    const fetchStats = async () => {
+      try {
+        const data = await healthService.getStats();
+        stats.value = {
+          total_devices: data.total_devices || 0,
+          total_led_actions: data.total_led_actions || 0,
+          led_actions_24h: data.led_actions_24h || 0,
+          realtime_messages: data.realtime_messages || 0
+        };
+      } catch (err) {
+        console.error('Erro ao buscar estatísticas:', err);
+      }
     };
 
     const fetchAllData = async () => {
       loading.value = true;
-      await new Promise(resolve => setTimeout(resolve, 500));
-      loading.value = false;
+      error.value = null;
+      
+      try {
+        await Promise.all([
+          fetchHealth(),
+          fetchStats(),
+          fetchLEDStatus(),
+          fetchHistory()
+        ]);
+        isOnline.value = true;
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+        error.value = 'Erro ao conectar com a API';
+        isOnline.value = false;
+      } finally {
+        loading.value = false;
+      }
     };
 
     const formatTime = (dateString) => {
+      if (!dateString) return 'N/A';
       const date = new Date(dateString);
       const now = new Date();
       const diff = Math.floor((now - date) / 1000);
@@ -414,7 +508,7 @@ export default {
 
     const drawChart = () => {
       const canvas = chartCanvas.value;
-      if (!canvas) return;
+      if (!canvas || history.value.length === 0) return;
       
       const ctx = canvas.getContext('2d');
       const width = canvas.width = canvas.offsetWidth * 2;
@@ -434,14 +528,38 @@ export default {
         ctx.stroke();
       }
       
+      // Processa dados do histórico para o gráfico
+      const last24h = history.value.filter(item => {
+        const itemDate = new Date(item.timestamp);
+        const now = new Date();
+        return (now - itemDate) < 24 * 60 * 60 * 1000;
+      });
+      
+      // Agrupa por hora
+      const internalByHour = new Array(24).fill(0);
+      const externalByHour = new Array(24).fill(0);
+      
+      last24h.forEach(item => {
+        const date = new Date(item.timestamp);
+        const hour = date.getHours();
+        if (item.led_type === 'internal' && item.action === 'ON') {
+          internalByHour[hour]++;
+        } else if (item.led_type === 'external' && item.action === 'ON') {
+          externalByHour[hour]++;
+        }
+      });
+      
+      const maxValue = Math.max(...internalByHour, ...externalByHour, 1);
+      
       // Internal LED
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      const internalData = [30, 45, 35, 50, 40, 55, 45, 60, 50, 65];
-      for (let i = 0; i < internalData.length; i++) {
-        const x = (width / 2) * (i / (internalData.length - 1));
-        const y = (height / 2) - (internalData[i] / 100 * height / 2);
+      for (let i = 0; i < 10; i++) {
+        const dataIndex = Math.floor((i / 10) * 24);
+        const value = internalByHour[dataIndex];
+        const x = (width / 2) * (i / 9);
+        const y = (height / 2) - (value / maxValue * height / 2 * 0.8);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
@@ -451,10 +569,11 @@ export default {
       ctx.strokeStyle = '#10b981';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      const externalData = [20, 35, 40, 30, 45, 50, 40, 55, 60, 50];
-      for (let i = 0; i < externalData.length; i++) {
-        const x = (width / 2) * (i / (externalData.length - 1));
-        const y = (height / 2) - (externalData[i] / 100 * height / 2);
+      for (let i = 0; i < 10; i++) {
+        const dataIndex = Math.floor((i / 10) * 24);
+        const value = externalByHour[dataIndex];
+        const x = (width / 2) * (i / 9);
+        const y = (height / 2) - (value / maxValue * height / 2 * 0.8);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
@@ -462,10 +581,28 @@ export default {
     };
 
     onMounted(async () => {
-      console.log('🍓 Dashboard com Tailwind CSS carregado!');
+      console.log('🍓 Dashboard conectado à API FastAPI');
+      await fetchAllData();
       await nextTick();
       drawChart();
       window.addEventListener('resize', drawChart);
+      
+      // Auto-refresh a cada 5 segundos
+      statusInterval = setInterval(() => {
+        fetchLEDStatus();
+        fetchStats();
+      }, 5000);
+      
+      // Refresh do histórico a cada 10 segundos
+      historyInterval = setInterval(() => {
+        fetchHistory();
+      }, 10000);
+    });
+
+    onBeforeUnmount(() => {
+      if (statusInterval) clearInterval(statusInterval);
+      if (historyInterval) clearInterval(historyInterval);
+      window.removeEventListener('resize', drawChart);
     });
 
     return {
@@ -476,6 +613,7 @@ export default {
       stats,
       history,
       chartCanvas,
+      error,
       toggleLED,
       fetchLEDStatus,
       fetchHistory,
