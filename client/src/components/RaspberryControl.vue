@@ -13,7 +13,7 @@
           <div class="flex items-center gap-3">
             <button 
               @click="fetchAllData" 
-              class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all hover:rotate-180 duration-300"
+              class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all"
             >
               <span class="text-xl">🔄</span>
             </button>
@@ -236,9 +236,6 @@
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 class="text-xl font-bold text-gray-900">Recent Activity</h2>
-            <button @click="fetchHistory" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-              Load More
-            </button>
           </div>
           <div class="p-6">
             <div class="space-y-3 max-h-80 overflow-y-auto">
