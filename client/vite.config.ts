@@ -5,5 +5,8 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     open: 'true'
+  },
+  css : {
+    postcss: './postcss.config.js'
   }
 })
