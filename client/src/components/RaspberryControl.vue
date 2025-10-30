@@ -70,6 +70,7 @@
               placeholder="192.168.130.166"
               v-model.trim="targetHost"
             />
+            <p class="mt-1 text-xs text-green-700">Somente LED usa este IP. Porta 8000 será assumida se omitida.</p>
           </div>
 
           <div class="mt-4 flex gap-4">
@@ -263,11 +264,18 @@ export default {
       return parsed.toFixed(1);
     };
 
+    const normalizeHost = (raw) => {
+      if (!raw) return null;
+      const cleaned = String(raw).trim().replace(/;|\s|,/g, '');
+      if (cleaned.length === 0) return null;
+      return cleaned;
+    };
+
     const toggleLED = async (status) => {
       loading.value = true;
       error.value = null;
       try {
-        const host = targetHost.value && targetHost.value.length > 0 ? targetHost.value : null;
+        const host = normalizeHost(targetHost.value);
         if (status === 'ON') {
           await ledService.turnOn('external', selectedDeviceId.value, externalLedPin.value, host);
         } else {
@@ -311,6 +319,7 @@ export default {
       ledStatusClasses,
       stringifyMessage,
       formatCpuPercent,
+      normalizeHost,
       toggleLED,
       
     };
@@ -344,4 +353,5 @@ button {
   width: 100%;
 }
 </style>
+
 
