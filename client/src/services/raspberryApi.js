@@ -25,27 +25,32 @@ api.interceptors.response.use(
 // ============= SERVIÇOS DE LED CONTROL =============
 export const ledService = {
   // Controlar LED (genérico)
-  controlLED: async (raspberryId, ledType, status) => {
+  controlLED: async (raspberryId, ledType, status, pin = null) => {
     const response = await api.post('/api/led/control', {
       raspberry_id: raspberryId,
       led_type: ledType,
-      status: status
+      status: status,
+      pin: pin
     });
     return response.data;
   },
 
   // Ligar LED específico
-  turnOn: async (ledType, raspberryId = 1) => {
+  turnOn: async (ledType, raspberryId = 1, pin = null) => {
+    const params = { raspberry_id: raspberryId };
+    if (pin !== null && pin !== undefined) params.pin = pin;
     const response = await api.post(`/api/led/${ledType}/on`, null, {
-      params: { raspberry_id: raspberryId }
+      params
     });
     return response.data;
   },
 
   // Desligar LED específico
-  turnOff: async (ledType, raspberryId = 1) => {
+  turnOff: async (ledType, raspberryId = 1, pin = null) => {
+    const params = { raspberry_id: raspberryId };
+    if (pin !== null && pin !== undefined) params.pin = pin;
     const response = await api.post(`/api/led/${ledType}/off`, null, {
-      params: { raspberry_id: raspberryId }
+      params
     });
     return response.data;
   },

@@ -86,6 +86,12 @@ class GPIOController:
         try:
             if GPIO_AVAILABLE:
                 _initialize_gpio_if_needed()
+                # Garante que o pino informado esteja configurado como saída
+                try:
+                    GPIO.setup(pin, GPIO.OUT)
+                except Exception:
+                    # Algumas implementações levantam se já configurado; ignorar
+                    pass
                 if state:
                     GPIO.output(pin, GPIO.HIGH)
                 else:

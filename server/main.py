@@ -67,7 +67,8 @@ def control_led(command: LEDCommand, db: Session = Depends(get_db)):
     if command.status.upper() not in ["ON", "OFF"]:
         raise HTTPException(status_code=400, detail="status deve ser 'ON' ou 'OFF'")
     
-    pin = GPIOController.get_pin(led_type)
+    # Usa o pino fornecido caso exista; senão, usa o padrão por tipo
+    pin = command.pin if command.pin is not None else GPIOController.get_pin(led_type)
     led_state = command.status.upper() == "ON"
     
     success = GPIOController.set_led(pin, led_state)
@@ -115,17 +116,19 @@ def control_led(command: LEDCommand, db: Session = Depends(get_db)):
 def led_on(
     led_type: str,
     raspberry_id: str = Query("1", description="ID da Raspberry Pi"),
+    pin: Optional[int] = Query(None, description="Número do pino GPIO (BCM) a ser usado"),
     db: Session = Depends(get_db)
 ):
-    return control_led(LEDCommand(status="ON", raspberry_id=raspberry_id, led_type=led_type), db)
+    return control_led(LEDCommand(status="ON", raspberry_id=raspberry_id, led_type=led_type, pin=pin), db)
 
 @app.post("/api/led/{led_type}/off", tags=["LED Control"])
 def led_off(
     led_type: str,
     raspberry_id: str = Query("1", description="ID da Raspberry Pi"),
+    pin: Optional[int] = Query(None, description="Número do pino GPIO (BCM) a ser usado"),
     db: Session = Depends(get_db)
 ):
-    return control_led(LEDCommand(status="OFF", raspberry_id=raspberry_id, led_type=led_type), db)
+    return control_led(LEDCommand(status="OFF", raspberry_id=raspberry_id, led_type=led_type, pin=pin), db)
 
 @app.get("/api/led/status", tags=["LED Control"])
 def get_led_status(

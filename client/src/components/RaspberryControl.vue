@@ -51,6 +51,17 @@
           </p>
           <p>Última atualização: {{ formatDate(selectedDeviceDetails.last_update) }}</p>
 
+          <div class="mt-3">
+            <label class="block text-sm text-green-900 mb-1">Pino GPIO (BCM) do LED externo</label>
+            <input
+              type="number"
+              class="w-32 px-2 py-1 border rounded"
+              :min="0"
+              :max="27"
+              v-model.number="externalLedPin"
+            />
+          </div>
+
           <div class="mt-4 flex gap-4">
             <button
               @click="toggleLED('ON')"
@@ -85,7 +96,7 @@
           </div>
           <div>
             <h4 class="font-semibold mb-1">% CPU</h4>
-            <p>{{ selectedDeviceDetails.cpu_percent.toFixed(1) }}%</p>
+            <p>{{ formatCpuPercent(selectedDeviceDetails.cpu_percent) }}%</p>
           </div>
           <div>
             <h4 class="font-semibold mb-1">GPIO usados</h4>
@@ -109,36 +120,7 @@
           </div>
         </div>
 
-        <!-- GRÁFICOS EM TEMPO REAL -->
-        <div class="mt-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
-          <h3 class="font-semibold mb-4 text-lg">Monitoramento em Tempo Real</h3>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- CPU Usage -->
-            <div class="bg-white p-4 rounded-lg shadow">
-              <h4 class="font-semibold mb-3 text-gray-700">CPU Usage (%)</h4>
-              <div class="chart-container">
-                <Line :data="cpuChartData" :options="chartOptions" />
-              </div>
-            </div>
-            
-            <!-- Temperatura -->
-            <div class="bg-white p-4 rounded-lg shadow">
-              <h4 class="font-semibold mb-3 text-gray-700">Temperatura (°C)</h4>
-              <div class="chart-container">
-                <Line :data="tempChartData" :options="chartOptions" />
-              </div>
-            </div>
-            
-            <!-- Network -->
-            <div class="bg-white p-4 rounded-lg shadow col-span-1 md:col-span-2">
-              <h4 class="font-semibold mb-3 text-gray-700">Tráfego de Rede (bytes)</h4>
-              <div class="chart-container">
-                <Line :data="networkChartData" :options="chartOptions" />
-              </div>
-            </div>
-          </div>
-        </div>
+        
       </section>
 
       <!-- Loading and Errors -->
@@ -159,17 +141,11 @@
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { Line } from 'vue-chartjs';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { deviceService, ledService, realtimeService } from '../services/raspberryApi.js';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 export default {
   name: 'RaspberryControl',
-  components: {
-    Line
-  },
+  components: {},
   setup() {
     const loading = ref(false);
     const error = ref(null);
@@ -179,119 +155,9 @@ export default {
     const selectedDeviceId = ref(null);
     const selectedDeviceDetails = ref(null);
     const realtimeMessages = ref([]);
-
-    // Arrays para histórico dos gráficos
-    const cpuHistory = ref([]);
-    const tempHistory = ref([]);
-    const networkSentHistory = ref([]);
-    const networkRecvHistory = ref([]);
-    const timeLabels = ref([]);
+    const externalLedPin = ref(17);
 
     let refreshTimer = null;
-
-    // Configurações dos gráficos
-    const chartOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top'
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true
-        }
-      }
-    };
-
-    // Dados reativos dos gráficos
-    const cpuChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [{
-        label: 'CPU %',
-        data: cpuHistory.value,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    }));
-
-    const tempChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [{
-        label: 'Temperatura °C',
-        data: tempHistory.value,
-        borderColor: 'rgb(239, 68, 68)',
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    }));
-
-    const networkChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [
-        {
-          label: 'Enviado',
-          data: networkSentHistory.value,
-          borderColor: 'rgb(34, 197, 94)',
-          backgroundColor: 'rgba(34, 197, 94, 0.1)',
-          tension: 0.4
-        },
-        {
-          label: 'Recebido',
-          data: networkRecvHistory.value,
-          borderColor: 'rgb(168, 85, 247)',
-          backgroundColor: 'rgba(168, 85, 247, 0.1)',
-          tension: 0.4
-        }
-      ]
-    }));
-
-    // Atualizar gráficos
-    const updateCharts = (details) => {
-      if (!details) return;
-      
-      const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const maxPoints = 20;
-      
-      // Atualizar labels de tempo
-      timeLabels.value.push(now);
-      if (timeLabels.value.length > maxPoints) {
-        timeLabels.value.shift();
-      }
-      
-      // CPU
-      cpuHistory.value.push(details.cpu_percent || 0);
-      if (cpuHistory.value.length > maxPoints) {
-        cpuHistory.value.shift();
-      }
-      
-      // Temperatura (remover °C)
-      const temp = parseFloat((details.cpu_temp || '0').toString().replace('°C', '').replace('C', '').trim()) || 0;
-      tempHistory.value.push(temp);
-      if (tempHistory.value.length > maxPoints) {
-        tempHistory.value.shift();
-      }
-      
-      // Network
-      networkSentHistory.value.push(details.net_bytes_sent || 0);
-      networkRecvHistory.value.push(details.net_bytes_recv || 0);
-      if (networkSentHistory.value.length > maxPoints) {
-        networkSentHistory.value.shift();
-        networkRecvHistory.value.shift();
-      }
-
-      console.log('Gráficos atualizados:', { 
-        cpu: details.cpu_percent, 
-        temp, 
-        sent: details.net_bytes_sent,
-        recv: details.net_bytes_recv
-      });
-    };
 
     const fetchDevices = async () => {
       try {
@@ -311,7 +177,6 @@ export default {
       try {
         const details = await deviceService.getDevice(id);
         selectedDeviceDetails.value = details;
-        updateCharts(details); // ← Atualizar gráficos
         isOnline.value = true;
       } catch {
         error.value = 'Erro ao buscar detalhes do dispositivo.';
@@ -351,13 +216,7 @@ export default {
     const selectDevice = async (id) => {
       if (id === selectedDeviceId.value) return;
       selectedDeviceId.value = id;
-      
-      // Resetar histórico ao trocar de dispositivo
-      cpuHistory.value = [];
-      tempHistory.value = [];
-      networkSentHistory.value = [];
-      networkRecvHistory.value = [];
-      timeLabels.value = [];
+      externalLedPin.value = 17;
       
       loading.value = true;
       error.value = null;
@@ -386,14 +245,21 @@ export default {
       }
     };
 
+    const formatCpuPercent = (value) => {
+      if (typeof value === 'number') return value.toFixed(1);
+      const parsed = parseFloat(String(value ?? '').replace('%', '').trim());
+      if (!Number.isFinite(parsed)) return '0.0';
+      return parsed.toFixed(1);
+    };
+
     const toggleLED = async (status) => {
       loading.value = true;
       error.value = null;
       try {
         if (status === 'ON') {
-          await ledService.turnOn('external', selectedDeviceId.value);
+          await ledService.turnOn('external', selectedDeviceId.value, externalLedPin.value);
         } else {
-          await ledService.turnOff('external', selectedDeviceId.value);
+          await ledService.turnOff('external', selectedDeviceId.value, externalLedPin.value);
         }
         await fetchDeviceDetails(selectedDeviceId.value);
       } catch (err) {
@@ -424,18 +290,16 @@ export default {
       selectedDeviceId,
       selectedDeviceDetails,
       realtimeMessages,
+      externalLedPin,
       filteredRealtimeMessages,
       fetchAllData,
       selectDevice,
       formatDate,
       ledStatusClasses,
       stringifyMessage,
+      formatCpuPercent,
       toggleLED,
-      // Gráficos
-      cpuChartData,
-      tempChartData,
-      networkChartData,
-      chartOptions
+      
     };
   }
 };
