@@ -7,6 +7,7 @@ class LEDCommand(BaseModel):
     status: str
     raspberry_id: Optional[str] = "1"
     led_type: Optional[str] = "external"
+    pin: Optional[int] = None
 
 class LEDHistoryResponse(BaseModel):
     id: int

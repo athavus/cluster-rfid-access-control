@@ -9,6 +9,38 @@ const api = axios.create({
   }
 });
 
+// Cria um cliente axios para um host específico (ex.: 192.168.130.166)
+const apiForHost = (hostWithOptionalPort) => {
+  const base = hostWithOptionalPort.startsWith('http')
+    ? hostWithOptionalPort
+    : `http://${hostWithOptionalPort}`;
+  // Garante porta 8000 quando nenhuma porta foi informada
+  let url;
+  try {
+    const u = new URL(base);
+    if (!u.port) {
+      u.port = '8000';
+    }
+    url = u.toString().replace(/\/$/, '');
+  } catch (e) {
+    url = base; // fallback
+  }
+  const instance = axios.create({
+    baseURL: url,
+    timeout: 10000,
+    headers: { 'Content-Type': 'application/json' }
+  });
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response) console.error('Erro na API (host override):', error.response.data);
+      else if (error.request) console.error('Erro de rede (host override):', error.request);
+      return Promise.reject(error);
+    }
+  );
+  return instance;
+};
+
 // Interceptor para tratamento de erros
 api.interceptors.response.use(
   (response) => response,
@@ -25,27 +57,35 @@ api.interceptors.response.use(
 // ============= SERVIÇOS DE LED CONTROL =============
 export const ledService = {
   // Controlar LED (genérico)
-  controlLED: async (raspberryId, ledType, status) => {
-    const response = await api.post('/api/led/control', {
+  controlLED: async (raspberryId, ledType, status, pin = null, host = null) => {
+    const client = host ? apiForHost(host) : api;
+    const response = await client.post('/api/led/control', {
       raspberry_id: raspberryId,
       led_type: ledType,
-      status: status
+      status: status,
+      pin: pin
     });
     return response.data;
   },
 
   // Ligar LED específico
-  turnOn: async (ledType, raspberryId = 1) => {
-    const response = await api.post(`/api/led/${ledType}/on`, null, {
-      params: { raspberry_id: raspberryId }
+  turnOn: async (ledType, raspberryId = 1, pin = null, host = null) => {
+    const client = host ? apiForHost(host) : api;
+    const params = { raspberry_id: raspberryId };
+    if (pin !== null && pin !== undefined) params.pin = pin;
+    const response = await client.post(`/api/led/${ledType}/on`, null, {
+      params
     });
     return response.data;
   },
 
   // Desligar LED específico
-  turnOff: async (ledType, raspberryId = 1) => {
-    const response = await api.post(`/api/led/${ledType}/off`, null, {
-      params: { raspberry_id: raspberryId }
+  turnOff: async (ledType, raspberryId = 1, pin = null, host = null) => {
+    const client = host ? apiForHost(host) : api;
+    const params = { raspberry_id: raspberryId };
+    if (pin !== null && pin !== undefined) params.pin = pin;
+    const response = await client.post(`/api/led/${ledType}/off`, null, {
+      params
     });
     return response.data;
   },
@@ -125,4 +165,5 @@ export const healthService = {
 };
 
 export default api;
+
 

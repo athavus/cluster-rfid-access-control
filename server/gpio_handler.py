@@ -70,6 +70,14 @@ except (ImportError, RuntimeError) as e:
 
 class GPIOController:
     """Controlador de GPIO com fallback para simulação"""
+    # Mapeamento básico BCM -> BOARD para header de 40 pinos
+    _BCM_TO_BOARD = {
+        2: 3, 3: 5, 4: 7, 17: 11, 27: 13, 22: 15,
+        10: 19, 9: 21, 11: 23, 0: 27, 1: 28, 5: 29,
+        6: 31, 13: 33, 19: 35, 26: 37, 14: 8, 15: 10,
+        18: 12, 23: 16, 24: 18, 25: 22, 8: 24, 7: 26,
+        12: 32, 16: 36, 20: 38, 21: 40
+    }
     
     @staticmethod
     def set_led(pin: int, state: bool) -> bool:
@@ -83,24 +91,33 @@ class GPIOController:
         Returns:
             True se bem-sucedido, False caso contrário
         """
-        try:
-            if GPIO_AVAILABLE:
-                _initialize_gpio_if_needed()
-                if state:
-                    GPIO.output(pin, GPIO.HIGH)
-                else:
-                    GPIO.output(pin, GPIO.LOW)
-                return True
+        if GPIO_AVAILABLE:
+            _initialize_gpio_if_needed()
+            current_mode = GPIO.getmode()
+            effective_pin = pin
+            if current_mode == GPIO.BOARD:
+                # Converte do BCM informado pelo cliente para BOARD
+                if pin not in GPIOController._BCM_TO_BOARD:
+                    raise ValueError(f"BCM {pin} não mapeado para BOARD")
+                effective_pin = GPIOController._BCM_TO_BOARD[pin]
+            # Garante que o pino informado esteja configurado como saída
+            try:
+                GPIO.setup(effective_pin, GPIO.OUT)
+            except Exception:
+                # Algumas implementações levantam se já configurado; ignorar
+                pass
+            if state:
+                GPIO.output(effective_pin, GPIO.HIGH)
             else:
-                # Modo simulação
-                if state:
-                    print(f"[SIMULAÇÃO] LED no pino {pin}: ON")
-                else:
-                    print(f"[SIMULAÇÃO] LED no pino {pin}: OFF")
-                return True
-        except Exception as e:
-            print(f"Erro ao controlar GPIO: {e}")
-            return False
+                GPIO.output(effective_pin, GPIO.LOW)
+            return True
+        else:
+            # Modo simulação
+            if state:
+                print(f"[SIMULAÇÃO] LED no pino {pin}: ON")
+            else:
+                print(f"[SIMULAÇÃO] LED no pino {pin}: OFF")
+            return True
     
     @staticmethod
     def get_pin(led_type: str) -> int:
@@ -122,5 +139,6 @@ class GPIOController:
                 print("GPIO cleanup realizado")
             except:
                 pass
+
 
 
