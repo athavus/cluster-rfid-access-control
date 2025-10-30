@@ -5,32 +5,68 @@ Manipulador de GPIO para Raspberry Pi 5
 try:
     # Para Raspberry Pi 5, usar rpi-lgpio
     import RPi.GPIO as GPIO
-    
-    # Configuração dos pinos
-    LED_EXTERNAL_PIN = 17  # GPIO17 (pino 11 físico)
-    LED_INTERNAL_PIN = 18  # GPIO18 (pino 12 físico) - LED interno da placa
-    
-    # Inicializar GPIO
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setwarnings(False)
-    
-    # Configurar pinos como saída
-    GPIO.setup(LED_EXTERNAL_PIN, GPIO.OUT)
-    GPIO.setup(LED_INTERNAL_PIN, GPIO.OUT)
-    
-    # Iniciar com LEDs desligados
-    GPIO.output(LED_EXTERNAL_PIN, GPIO.LOW)
-    GPIO.output(LED_INTERNAL_PIN, GPIO.LOW)
-    
+
+    # Configuração dos pinos (referências BCM e BOARD)
+    LED_EXTERNAL_PIN_BCM = 17  # GPIO17 (pino 11 físico)
+    LED_INTERNAL_PIN_BCM = 18  # GPIO18 (pino 12 físico) - LED interno da placa
+    LED_EXTERNAL_PIN_BOARD = 11  # Pino físico 11 (equivale ao BCM17)
+    LED_INTERNAL_PIN_BOARD = 12  # Pino físico 12 (equivale ao BCM18)
+
+    # Pinos efetivos ativos serão definidos na inicialização
+    _ACTIVE_LED_EXTERNAL_PIN = None
+    _ACTIVE_LED_INTERNAL_PIN = None
+    _INITIALIZED = False
+
+    def _initialize_gpio_if_needed():
+        """Inicializa GPIO uma única vez, respeitando o modo já definido (BOARD/BCM)."""
+        global _INITIALIZED, _ACTIVE_LED_EXTERNAL_PIN, _ACTIVE_LED_INTERNAL_PIN
+        if _INITIALIZED:
+            return
+        current_mode = GPIO.getmode()
+        # Não force um modo se já houver um definido para evitar
+        # "A different mode has already been set!"
+        if current_mode is None:
+            # Escolha padrão: BCM quando não houver modo definido
+            GPIO.setmode(GPIO.BCM)
+            current_mode = GPIO.BCM
+
+        GPIO.setwarnings(False)
+
+        if current_mode == GPIO.BOARD:
+            _ACTIVE_LED_EXTERNAL_PIN = LED_EXTERNAL_PIN_BOARD
+            _ACTIVE_LED_INTERNAL_PIN = LED_INTERNAL_PIN_BOARD
+        else:
+            # Trata BCM e quaisquer outros casos como BCM
+            _ACTIVE_LED_EXTERNAL_PIN = LED_EXTERNAL_PIN_BCM
+            _ACTIVE_LED_INTERNAL_PIN = LED_INTERNAL_PIN_BCM
+
+        # Configurar pinos como saída
+        GPIO.setup(_ACTIVE_LED_EXTERNAL_PIN, GPIO.OUT)
+        GPIO.setup(_ACTIVE_LED_INTERNAL_PIN, GPIO.OUT)
+
+        # Iniciar com LEDs desligados
+        GPIO.output(_ACTIVE_LED_EXTERNAL_PIN, GPIO.LOW)
+        GPIO.output(_ACTIVE_LED_INTERNAL_PIN, GPIO.LOW)
+
+        _INITIALIZED = True
+        print("GPIO inicializado com sucesso")
+
     GPIO_AVAILABLE = True
-    print("GPIO inicializado com sucesso")
-    
+
 except (ImportError, RuntimeError) as e:
     print(f"GPIO não disponível: {e}")
     print("Rodando em modo de simulação")
     GPIO_AVAILABLE = False
-    LED_EXTERNAL_PIN = 17
-    LED_INTERNAL_PIN = 18
+    # Fallback para simulação
+    LED_EXTERNAL_PIN_BCM = 17
+    LED_INTERNAL_PIN_BCM = 18
+    LED_EXTERNAL_PIN_BOARD = 11
+    LED_INTERNAL_PIN_BOARD = 12
+    _ACTIVE_LED_EXTERNAL_PIN = LED_EXTERNAL_PIN_BCM
+    _ACTIVE_LED_INTERNAL_PIN = LED_INTERNAL_PIN_BCM
+    _INITIALIZED = True
+    def _initialize_gpio_if_needed():
+        return
 
 class GPIOController:
     """Controlador de GPIO com fallback para simulação"""
@@ -49,6 +85,7 @@ class GPIOController:
         """
         try:
             if GPIO_AVAILABLE:
+                _initialize_gpio_if_needed()
                 if state:
                     GPIO.output(pin, GPIO.HIGH)
                 else:
@@ -68,10 +105,13 @@ class GPIOController:
     @staticmethod
     def get_pin(led_type: str) -> int:
         """Retorna o pino GPIO baseado no tipo de LED"""
+        # Garante inicialização para termos os pinos ativos corretos
+        if GPIO_AVAILABLE:
+            _initialize_gpio_if_needed()
         if led_type == "internal":
-            return LED_INTERNAL_PIN
+            return _ACTIVE_LED_INTERNAL_PIN
         else:
-            return LED_EXTERNAL_PIN
+            return _ACTIVE_LED_EXTERNAL_PIN
     
     @staticmethod
     def cleanup():
@@ -82,4 +122,5 @@ class GPIOController:
                 print("GPIO cleanup realizado")
             except:
                 pass
+
 

@@ -5,9 +5,11 @@
       <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
         <h1 class="text-xl font-semibold text-gray-900">Raspberry Pi IoT Dashboard</h1>
         <div class="flex items-center gap-4">
-          <button @click="fetchAllData" class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">Atualizar</button>
+          <button @click="fetchAllData"
+            class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">Atualizar</button>
           <div class="flex items-center gap-2 text-sm font-medium">
-            <span class="inline-block w-3 h-3 rounded-full" :class="isOnline ? 'bg-green-500' : 'bg-red-500'" aria-label="Conexão"></span>
+            <span class="inline-block w-3 h-3 rounded-full" :class="isOnline ? 'bg-green-500' : 'bg-red-500'"
+              aria-label="Conexão"></span>
             <span>{{ isOnline ? 'Online' : 'Offline' }}</span>
           </div>
         </div>
@@ -21,12 +23,9 @@
         <h2 class="font-semibold text-gray-800 mb-4">Dispositivos</h2>
         <ul class="space-y-2">
           <li v-for="device in devices" :key="device.raspberry_id">
-            <button
-              @click="selectDevice(device.raspberry_id)"
-              type="button"
+            <button @click="selectDevice(device.raspberry_id)" type="button"
               class="w-full text-left px-4 py-2 rounded-md cursor-pointer transition-colors"
-              :class="selectedDeviceId === device.raspberry_id ? 'bg-blue-500 text-white' : 'hover:bg-blue-50 text-gray-700'"
-            >
+              :class="selectedDeviceId === device.raspberry_id ? 'bg-blue-500 text-white' : 'hover:bg-blue-50 text-gray-700'">
               Raspberry ID: {{ device.raspberry_id }}
             </button>
           </li>
@@ -34,10 +33,8 @@
       </section>
 
       <!-- Device Details -->
-      <section
-        v-if="selectedDeviceDetails"
-        class="col-span-3 bg-white rounded-lg shadow p-6 overflow-auto max-h-[calc(100vh-128px)]"
-      >
+      <section v-if="selectedDeviceDetails"
+        class="col-span-3 bg-white rounded-lg shadow p-6 overflow-auto max-h-[calc(100vh-128px)]">
         <h2 class="text-lg font-semibold mb-4">Detalhes do Dispositivo: {{ selectedDeviceId }}</h2>
 
         <!-- LED Externo Status + Controle -->
@@ -52,18 +49,12 @@
           <p>Última atualização: {{ formatDate(selectedDeviceDetails.last_update) }}</p>
 
           <div class="mt-4 flex gap-4">
-            <button
-              @click="toggleLED('ON')"
-              :disabled="loading"
-              class="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all hover:scale-105 active:scale-95"
-            >
+            <button @click="toggleLED('ON')" :disabled="loading"
+              class="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all hover:scale-105 active:scale-95">
               Ligar
             </button>
-            <button
-              @click="toggleLED('OFF')"
-              :disabled="loading"
-              class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all hover:scale-105 active:scale-95"
-            >
+            <button @click="toggleLED('OFF')" :disabled="loading"
+              class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all hover:scale-105 active:scale-95">
               Desligar
             </button>
           </div>
@@ -109,48 +100,43 @@
           </div>
         </div>
 
-        <!-- GRÁFICOS EM TEMPO REAL -->
-        <div class="mt-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
-          <h3 class="font-semibold mb-4 text-lg">Monitoramento em Tempo Real</h3>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- CPU Usage -->
-            <div class="bg-white p-4 rounded-lg shadow">
-              <h4 class="font-semibold mb-3 text-gray-700">CPU Usage (%)</h4>
-              <div class="chart-container">
-                <Line :data="cpuChartData" :options="chartOptions" />
-              </div>
-            </div>
-            
-            <!-- Temperatura -->
-            <div class="bg-white p-4 rounded-lg shadow">
-              <h4 class="font-semibold mb-3 text-gray-700">Temperatura (°C)</h4>
-              <div class="chart-container">
-                <Line :data="tempChartData" :options="chartOptions" />
-              </div>
-            </div>
-            
-            <!-- Network -->
-            <div class="bg-white p-4 rounded-lg shadow col-span-1 md:col-span-2">
-              <h4 class="font-semibold mb-3 text-gray-700">Tráfego de Rede (bytes)</h4>
-              <div class="chart-container">
-                <Line :data="networkChartData" :options="chartOptions" />
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Real-time Messages -->
-        <div class="mt-6 overflow-auto max-h-64 bg-gray-50 p-4 rounded-md border border-gray-200">
+        <div class="overflow-auto max-h-64 bg-gray-50 p-4 rounded-md border border-gray-200">
           <h3 class="font-semibold mb-3">Mensagens em tempo real (últimas 50)</h3>
           <div v-if="filteredRealtimeMessages.length === 0" class="text-gray-500 text-sm">
             Nenhuma mensagem recente para este dispositivo.
           </div>
           <ul v-else class="space-y-2 text-xs font-mono text-gray-700">
-            <li v-for="(msg, idx) in filteredRealtimeMessages" :key="idx" class="whitespace-pre-wrap break-all bg-white p-2 rounded shadow-sm">
+            <li v-for="(msg, idx) in filteredRealtimeMessages" :key="idx"
+              class="whitespace-pre-wrap break-all bg-white p-2 rounded shadow-sm">
               {{ stringifyMessage(msg) }}
             </li>
           </ul>
+        </div>
+
+        <!-- Grafana Status -->
+        <div class="mt-6 bg-white p-6 rounded-lg border border-gray-200">
+          <h3 class="font-semibold mb-4 text-lg">Monitoramento em Tempo Real</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- CPU Usage -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h4 class="font-semibold mb-3 text-gray-700">Uso de CPU (%)</h4>
+              <Line :data="cpuChartData" :options="chartOptions" />
+            </div>
+
+            <!-- Temperatura -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h4 class="font-semibold mb-3 text-gray-700">Temperatura (°C)</h4>
+              <Line :data="tempChartData" :options="chartOptions" />
+            </div>
+
+            <!-- Network -->
+            <div class="bg-gray-50 p-4 rounded-lg col-span-1 md:col-span-2">
+              <h4 class="font-semibold mb-3 text-gray-700">Tráfego de Rede (bytes)</h4>
+              <Line :data="networkChartData" :options="chartOptions" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -161,9 +147,10 @@
       </div>
 
       <div v-if="loading" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
-        <svg class="animate-spin h-12 w-12 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+        <svg class="animate-spin h-12 w-12 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none"
+          viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
         </svg>
       </div>
     </main>
@@ -171,18 +158,17 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { deviceService, ledService, healthService, realtimeService } from '../services/raspberryApi.js';
+// Importando o ChartJS para o Gráfico
 import { Line } from 'vue-chartjs';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
-import { deviceService, ledService, realtimeService } from '../services/raspberryApi.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
+
 export default {
   name: 'RaspberryControl',
-  components: {
-    Line
-  },
   setup() {
     const loading = ref(false);
     const error = ref(null);
@@ -193,17 +179,59 @@ export default {
     const selectedDeviceDetails = ref(null);
     const realtimeMessages = ref([]);
 
-    // Arrays para histórico dos gráficos
+    //Inserindo Leitura ao gráfico
+
+    // Dados dos gráficos
     const cpuHistory = ref([]);
     const tempHistory = ref([]);
-    const networkSentHistory = ref([]);
-    const networkRecvHistory = ref([]);
+    const networkHistory = ref([]);
     const timeLabels = ref([]);
 
-    let refreshTimer = null;
+    const cpuChartData = ref({
+      labels: [],
+      datasets: [{
+        label: 'CPU %',
+        data: [],
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    });
 
-    // Configurações dos gráficos
-    const chartOptions = {
+    const tempChartData = ref({
+      labels: [],
+      datasets: [{
+        label: 'Temperatura °C',
+        data: [],
+        borderColor: 'rgb(239, 68, 68)',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    });
+
+    const networkChartData = ref({
+      labels: [],
+      datasets: [
+        {
+          label: 'Enviado',
+          data: [],
+          borderColor: 'rgb(34, 197, 94)',
+          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+          tension: 0.4
+        },
+        {
+          label: 'Recebido',
+          data: [],
+          borderColor: 'rgb(168, 85, 247)',
+          backgroundColor: 'rgba(168, 85, 247, 0.1)',
+          tension: 0.4
+        }
+      ]
+    });
+
+    const chartOptions = ref({
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
@@ -217,102 +245,62 @@ export default {
           beginAtZero: true
         }
       }
-    };
+    });
 
-    // Dados reativos dos gráficos
-    const cpuChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [{
-        label: 'CPU %',
-        data: cpuHistory.value,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    }));
-
-    const tempChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [{
-        label: 'Temperatura °C',
-        data: tempHistory.value,
-        borderColor: 'rgb(239, 68, 68)',
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    }));
-
-    const networkChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [
-        {
-          label: 'Enviado',
-          data: networkSentHistory.value,
-          borderColor: 'rgb(34, 197, 94)',
-          backgroundColor: 'rgba(34, 197, 94, 0.1)',
-          tension: 0.4
-        },
-        {
-          label: 'Recebido',
-          data: networkRecvHistory.value,
-          borderColor: 'rgb(168, 85, 247)',
-          backgroundColor: 'rgba(168, 85, 247, 0.1)',
-          tension: 0.4
-        }
-      ]
-    }));
-
-    // Atualizar gráficos
+    // Função para atualizar gráficos
     const updateCharts = (details) => {
       if (!details) return;
-      
-      const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      const now = new Date().toLocaleTimeString('pt-BR');
+
+      // Manter apenas últimos 20 pontos
       const maxPoints = 20;
-      
-      // Atualizar labels de tempo
+
+      // Atualizar labels
       timeLabels.value.push(now);
       if (timeLabels.value.length > maxPoints) {
         timeLabels.value.shift();
       }
-      
+
       // CPU
-      cpuHistory.value.push(details.cpu_percent || 0);
+      cpuHistory.value.push(details.cpu_percent);
       if (cpuHistory.value.length > maxPoints) {
         cpuHistory.value.shift();
       }
-      
-      // Temperatura (remover °C)
-      const temp = parseFloat((details.cpu_temp || '0').toString().replace('°C', '').replace('C', '').trim()) || 0;
+      cpuChartData.value.labels = [...timeLabels.value];
+      cpuChartData.value.datasets[0].data = [...cpuHistory.value];
+
+      // Temperatura
+      const temp = parseFloat(details.cpu_temp?.replace('°C', '').replace('C', '') || 0);
       tempHistory.value.push(temp);
       if (tempHistory.value.length > maxPoints) {
         tempHistory.value.shift();
       }
-      
-      // Network
-      networkSentHistory.value.push(details.net_bytes_sent || 0);
-      networkRecvHistory.value.push(details.net_bytes_recv || 0);
-      if (networkSentHistory.value.length > maxPoints) {
-        networkSentHistory.value.shift();
-        networkRecvHistory.value.shift();
-      }
+      tempChartData.value.labels = [...timeLabels.value];
+      tempChartData.value.datasets[0].data = [...tempHistory.value];
 
-      console.log('Gráficos atualizados:', { 
-        cpu: details.cpu_percent, 
-        temp, 
-        sent: details.net_bytes_sent,
-        recv: details.net_bytes_recv
+      // Network
+      networkHistory.value.push({
+        sent: details.net_bytes_sent || 0,
+        recv: details.net_bytes_recv || 0
       });
+      if (networkHistory.value.length > maxPoints) {
+        networkHistory.value.shift();
+      }
+      networkChartData.value.labels = [...timeLabels.value];
+      networkChartData.value.datasets[0].data = networkHistory.value.map(n => n.sent);
+      networkChartData.value.datasets[1].data = networkHistory.value.map(n => n.recv);
     };
+
+    //Leitura termina aqui
+
+    let refreshTimer = null;
 
     const fetchDevices = async () => {
       try {
         const data = await deviceService.getAllDevices();
         devices.value = data;
-        if (!selectedDeviceId.value && data.length > 0) {
-          selectedDeviceId.value = data[0].raspberry_id;
-        }
+        if (!selectedDeviceId.value && data.length > 0) selectedDeviceId.value = data[0].raspberry_id;
       } catch (err) {
         error.value = 'Erro ao buscar dispositivos.';
         isOnline.value = false;
@@ -324,7 +312,7 @@ export default {
       try {
         const details = await deviceService.getDevice(id);
         selectedDeviceDetails.value = details;
-        updateCharts(details); // ← Atualizar gráficos
+        updateCharts(details); // para o gráfico
         isOnline.value = true;
       } catch {
         error.value = 'Erro ao buscar detalhes do dispositivo.';
@@ -364,33 +352,18 @@ export default {
     const selectDevice = async (id) => {
       if (id === selectedDeviceId.value) return;
       selectedDeviceId.value = id;
-      
-      // Resetar histórico ao trocar de dispositivo
-      cpuHistory.value = [];
-      tempHistory.value = [];
-      networkSentHistory.value = [];
-      networkRecvHistory.value = [];
-      timeLabels.value = [];
-      
       loading.value = true;
       error.value = null;
       await fetchDeviceDetails(id);
       loading.value = false;
     };
 
-    const filteredRealtimeMessages = computed(() => {
-      return realtimeMessages.value.filter(msg => msg.raspberry_id == selectedDeviceId.value);
-    });
-
+    const filteredRealtimeMessages = () => realtimeMessages.value.filter(msg => msg.raspberry_id == selectedDeviceId.value);
     const formatDate = (dateStr) => {
       if (!dateStr) return 'N/A';
       return new Date(dateStr).toLocaleString('pt-BR');
     };
-
-    const ledStatusClasses = (statusBoolean) => {
-      return statusBoolean ? 'text-green-600 font-semibold' : 'text-gray-500 font-normal';
-    };
-
+    const ledStatusClasses = (statusBoolean) => statusBoolean ? 'text-green-600 font-semibold' : 'text-gray-500 font-normal';
     const stringifyMessage = (msg) => {
       try {
         return JSON.stringify(msg, null, 2);
@@ -399,6 +372,7 @@ export default {
       }
     };
 
+    // Toggle LED externo usando as rotas corretas do backend
     const toggleLED = async (status) => {
       loading.value = true;
       error.value = null;
@@ -418,10 +392,8 @@ export default {
     onMounted(() => {
       fetchAllData();
       refreshTimer = setInterval(() => {
-        if (selectedDeviceId.value) {
-          fetchDeviceDetails(selectedDeviceId.value);
-          fetchRealtimeMessages();
-        }
+        fetchDeviceDetails(selectedDeviceId.value);
+        fetchRealtimeMessages();
       }, 5000);
     });
 
@@ -444,11 +416,11 @@ export default {
       ledStatusClasses,
       stringifyMessage,
       toggleLED,
-      // Gráficos
       cpuChartData,
       tempChartData,
       networkChartData,
-      chartOptions
+      chartOptions,
+      Line
     };
   }
 };
@@ -474,9 +446,8 @@ button {
   transition: background-color 0.3s ease;
 }
 
-.chart-container {
-  position: relative;
-  height: 250px;
-  width: 100%;
+canvas {
+  max-height: 250px !important;
 }
 </style>
+

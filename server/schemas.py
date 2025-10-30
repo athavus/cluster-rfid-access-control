@@ -75,11 +75,12 @@ class DeviceStatusResponse(BaseModel):
     last_update: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     @classmethod
     def from_orm(cls, obj):
         data = obj.__dict__.copy()
         data['net_ifaces'] = json.loads(data.get('net_ifaces', '[]'))
         return cls(**data)
+
 

@@ -22,6 +22,10 @@ init_db()
 
 # Iniciar RFID handler
 init_rfid_handler()
+rfid_handler = get_rfid_handler()
+if rfid_handler:
+    # Inicia thread de polling para leitura contínua de tags
+    rfid_handler.start_polling(interval=0.3)
 
 # Iniciar consumer do RabbitMQ em thread separada
 start_consumer_thread()
@@ -166,6 +170,8 @@ def receive_rfid_read(read_event: RFIDReadEvent, db: Session = Depends(get_db)):
     Pode ser chamado pelo hardware da Raspberry ou usado para testes.
     """
     try:
+        # Logar no terminal a leitura recebida
+        print(f"[RFID] Evento recebido UID={read_event.uid} Nome={read_event.tag_name} Raspberry={read_event.raspberry_id}")
         # Salvar ou atualizar tag no banco
         tag = db.query(RFIDTag).filter(RFIDTag.uid == read_event.uid).first()
         if not tag:
@@ -441,4 +447,5 @@ def shutdown_event():
     print("Desligando API...")
     GPIOController.cleanup()
     cleanup_rfid()
+
 

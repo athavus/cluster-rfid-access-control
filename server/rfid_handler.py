@@ -29,6 +29,15 @@ class RFIDHandler:
         
         if RFID_AVAILABLE:
             try:
+                # Garantir que nenhum modo GPIO conflitante esteja ativo antes do RFID()
+                try:
+                    import RPi.GPIO as GPIO
+                    current_mode = GPIO.getmode()
+                    if current_mode is not None:
+                        # Zera estado para permitir que pirc522 defina o modo necessário
+                        GPIO.cleanup()
+                except Exception:
+                    pass
                 self.reader = RFID()
                 self.util = self.reader.util()
                 self.util.debug = False
@@ -128,6 +137,9 @@ class RFIDHandler:
             # Registrar leitura
             self.record_read(uid_str, tag_name)
             
+            # Exibir UID lido no terminal
+            print(f"[RFID] Tag lida UID={uid_str} Nome={tag_name}")
+
             result = {
                 "uid": uid_str,
                 "tag_name": tag_name,
@@ -210,4 +222,5 @@ def cleanup_rfid():
     if _rfid_handler:
         _rfid_handler.stop_polling()
         _rfid_handler = None
+
 
