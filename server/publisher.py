@@ -102,8 +102,7 @@ def publish_health_data():
                 print(f"[{time.strftime('%H:%M:%S')}] Rasp {raspberry_id}: {data}")
 
                 cont_messages += 1
-                time.sleep(0.01)  # Envio a cada 10 ms
-
+                time.sleep(1)
             except KeyboardInterrupt:
                 print("\nParando publicador...")
                 break
