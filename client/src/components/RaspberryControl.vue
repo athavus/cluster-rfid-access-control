@@ -436,11 +436,6 @@ export default {
       normalizeHost,
       toggleLED,
       downloadDb,
-      // charts
-      chartOptions,
-      tempChartData,
-      cpuChartData,
-      ramChartData,
       // RFID
       showRfidBanner,
       lastRfidUid,
@@ -482,6 +477,7 @@ button {
   width: 100%;
 }
 </style>
+
 
 
 
