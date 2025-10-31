@@ -8,13 +8,19 @@ from controllers.buttons import read_button
 import time
 
 # Conjunto de caracteres disponíveis (ordem lógica)
+# Inclui caracteres de ação: '<' (backspace) e múltiplos de confirmação (' ', '>', '=', '#')
 CHARSET = (
     "abcdefghijklmnopqrstuvwxyz"
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "0123456789"
     "!@#$%&*()-_=+[]{}|;:',.<>?/\\ "
     "~`^\""
+    "<>#="  # adiciona backspace '<' e confirmações extras '#', '>' e '='
 )
+
+# Conjuntos especiais para ações
+SUBMIT_CHARS = {" ", ">", "=", "#"}
+BACKSPACE_CHAR = "<"
 
 def handle_password_input(ssid, on_connect_callback=None):
     """
@@ -68,13 +74,21 @@ def password_input_mode(ssid, on_connect_callback=None):
             elif button == 'ok':
                 # Comportamentos diferentes dependendo do contexto
                 current_char = CHARSET[cursor_pos]
-                
-                # Se senha está vazia e caractere é espaço, cancela
-                if len(password) == 0 and current_char == ' ':
-                    return (False, None)
-                
-                # Se senha tem conteúdo e caractere é espaço, tenta conectar
-                if len(password) > 0 and current_char == ' ':
+
+                # Ação: backspace
+                if current_char == BACKSPACE_CHAR:
+                    if len(password) > 0:
+                        password = password[:-1]
+                        draw_password_roulette(ssid, password, CHARSET, cursor_pos)
+                    else:
+                        return (False, None)
+                    
+                # Ação: confirmar (qualquer um dos SUBMIT_CHARS)
+                elif current_char in SUBMIT_CHARS:
+                    if len(password) == 0:
+                        # Nada digitado → cancelar
+                        return (False, None)
+
                     # Confirma conexão
                     draw_connecting(ssid)
                     
@@ -93,7 +107,7 @@ def password_input_mode(ssid, on_connect_callback=None):
                     else:
                         # Modo teste - sempre sucesso
                         return (True, password)
-                
+
                 # Senão, adiciona caractere à senha
                 else:
                     password += current_char

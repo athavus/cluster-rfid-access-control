@@ -180,6 +180,13 @@ def draw_password_roulette(ssid, password, charset, cursor_pos):
         else:
             draw.text((x_pos, y_pos), char, font=font_normal, fill=255)
     
+    # Dicas de uso na base
+    try:
+        draw.text((2, 56), "< back  >/=/# OK", font=font_normal, fill=255)
+    except Exception:
+        # Em caso de fonte sem suporte, ignorar
+        pass
+
     disp.image(image)
     disp.show()
     

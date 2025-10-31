@@ -1,5 +1,48 @@
 import subprocess
 
+
+def get_connected_ssid():
+    """
+    ----------------------------------------------------------------------
+    @brief Retorna o SSID da rede Wi-Fi atualmente conectada.
+
+    Obtem o nome (SSID) da rede ativa através do NetworkManager.
+    Se não houver rede conectada, retorna uma string vazia.
+
+    @return String com o SSID da rede atual ou "" se desconectado.
+    ----------------------------------------------------------------------
+    """
+    try:
+        cmd = "nmcli -t -f active,ssid dev wifi | egrep '^yes' | cut -d: -f2"
+        return subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
+    except subprocess.CalledProcessError:
+        return ""
+
+
+def list_available_ssids():
+    """
+    ----------------------------------------------------------------------
+    @brief Lista todos os SSIDs disponíveis nas proximidades.
+
+    Força a revarredura (`rescan`) de redes Wi-Fi
+    e retorna uma lista de nomes de SSIDs únicos detectados.
+
+    @return Lista de strings contendo os SSIDs disponíveis.
+    ----------------------------------------------------------------------
+    """
+    try:
+        cmd = "sudo nmcli dev wifi rescan && sudo nmcli -t -f ssid dev wifi list"
+        available_ssids = subprocess.check_output(cmd, shell=True).decode("utf-8").splitlines()
+
+        valid_ssids = []
+        for ssid in available_ssids:
+            if ssid and ssid not in valid_ssids:
+                valid_ssids.append(ssid)
+    
+        return valid_ssids
+    except subprocess.CalledProcessError:
+        return []
+
 def get_connected_ssid():
     """
     ----------------------------------------------------------------------

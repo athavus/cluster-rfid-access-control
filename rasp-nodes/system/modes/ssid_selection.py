@@ -1,7 +1,8 @@
 import time
-from controllers.display import draw_ssid_selection, display_message
+from controllers.display import draw_ssid_selection, display_message, draw_connecting, draw_success, draw_error
 from controllers.buttons import read_button
 from system.modes.password_input import handle_password_input
+from controllers.wifi import known_connections, connect_to_wifi
 
 def handle_ssid_selection(available_ssids):
     index, scroll_offset = 0, 0
@@ -22,6 +23,29 @@ def handle_ssid_selection(available_ssids):
             index = (index + 1) % len(available_ssids)
         elif btn == 'ok':
             selected_ssid = available_ssids[index]
-            handle_password_input(selected_ssid)
+
+            # Se rede já é conhecida, tenta conectar direto (pula senha)
+            if selected_ssid in known_connections():
+                draw_connecting(selected_ssid)
+                success = connect_to_wifi(selected_ssid, "")
+                if success:
+                    # Mostra sucesso (IP será mostrado pela próxima tela de status)
+                    draw_success(selected_ssid)
+                else:
+                    draw_error("Falha ao conectar")
+                time.sleep(2)
+                selecting_ssid = False
+                continue
+
+            # Caso contrário, pede senha e conecta
+            def on_connect(ssid, password):
+                ok = connect_to_wifi(ssid, password)
+                if ok:
+                    # Retorna (success, message) sendo message o IP buscável na tela seguinte
+                    return (True, "")
+                else:
+                    return (False, "Senha incorreta ou falha")
+
+            handle_password_input(selected_ssid, on_connect_callback=on_connect)
             selecting_ssid = False
 
