@@ -135,6 +135,30 @@
         
       </section>
 
+      <!-- Real-time charts grid -->
+      <section v-if="selectedDeviceId" class="col-span-1 lg:col-span-4">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-4 rounded-lg shadow lg:col-span-2">
+            <h4 class="font-semibold mb-3 text-gray-700">Temperatura (°C)</h4>
+            <div class="chart-container" style="height:320px;">
+              <Line :data="tempChartData" :options="chartOptions" />
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-lg shadow">
+            <h4 class="font-semibold mb-3 text-gray-700">CPU (%)</h4>
+            <div class="chart-container" style="height:220px;">
+              <Line :data="cpuChartData" :options="chartOptions" />
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-lg shadow">
+            <h4 class="font-semibold mb-3 text-gray-700">RAM (%)</h4>
+            <div class="chart-container" style="height:220px;">
+              <Line :data="ramChartData" :options="chartOptions" />
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Loading and Errors -->
       <div v-if="error" class="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50">
         {{ error }}
@@ -150,7 +174,7 @@
 
       <!-- RFID Banner -->
       <div v-if="showRfidBanner" class="fixed top-20 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50">
-        RFID detectado: UID {{ lastRfidUid }}
+        {{ lastRfidDisplay }}
       </div>
 
       <!-- RFID Modal -->
@@ -168,7 +192,7 @@
 
       <!-- RFID Banner -->
       <div v-if="showRfidBanner" class="fixed top-20 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50">
-        RFID detectado: UID {{ lastRfidUid }}
+        {{ lastRfidDisplay }}
       </div>
 
       <!-- RFID Modal -->
@@ -189,11 +213,15 @@
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { Line } from 'vue-chartjs';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { deviceService, ledService, realtimeService, rfidService, exportService } from '../services/raspberryApi.js';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 export default {
   name: 'RaspberryControl',
-  components: {},
+  components: { Line },
   setup() {
     const loading = ref(false);
     const error = ref(null);
@@ -206,6 +234,7 @@ export default {
     const externalLedPin = ref(17);
     const targetHost = ref('');
     const lastRfidUid = ref(null);
+    const lastRfidDisplay = ref('');
     const lastRfidTimestamp = ref(null);
     const showRfidBanner = ref(false);
     const showNameModal = ref(false);
@@ -213,8 +242,46 @@ export default {
     const modalCountdown = ref(15);
     let modalTimer = null;
     let bannerTimer = null;
+    const detectionCooldownMs = 3000;
+    const lastHandledAt = ref(0);
 
     let refreshTimer = null;
+
+    // Charts state
+    const timeLabels = ref([]);
+    const cpuTempHistory = ref([]);
+    const cpuPercentHistory = ref([]);
+    const ramPercentHistory = ref([]);
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'top' } },
+      scales: { y: { beginAtZero: true } }
+    };
+    const tempChartData = computed(() => ({
+      labels: timeLabels.value,
+      datasets: [{ label: 'CPU Temp °C', data: cpuTempHistory.value, borderColor: 'rgb(239,68,68)', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.3, fill: true }]
+    }));
+    const cpuChartData = computed(() => ({
+      labels: timeLabels.value,
+      datasets: [{ label: 'CPU %', data: cpuPercentHistory.value, borderColor: 'rgb(59,130,246)', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, fill: true }]
+    }));
+    const ramChartData = computed(() => ({
+      labels: timeLabels.value,
+      datasets: [{ label: 'RAM %', data: ramPercentHistory.value, borderColor: 'rgb(34,197,94)', backgroundColor: 'rgba(34,197,94,0.1)', tension: 0.3, fill: true }]
+    }));
+    const pushChartPoint = (msg) => {
+      const nowLabel = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const maxPoints = 30;
+      timeLabels.value.push(nowLabel);
+      if (timeLabels.value.length > maxPoints) timeLabels.value.shift();
+      const t = parseFloat(String((msg.cpu_temp ?? msg.temp ?? '0')).toString().replace('°C','').replace('C','').trim()) || 0;
+      cpuTempHistory.value.push(t); if (cpuTempHistory.value.length > maxPoints) cpuTempHistory.value.shift();
+      const c = (()=>{ const v = msg.cpu_percent ?? msg.cpu ?? 0; const n = parseFloat(String(v).replace('%','')); return Number.isFinite(n)?n:0; })();
+      cpuPercentHistory.value.push(c); if (cpuPercentHistory.value.length > maxPoints) cpuPercentHistory.value.shift();
+      const r = (()=>{ const v = msg.mem_percent ?? msg.ram_percent ?? msg.mem_usage_percent; const n = parseFloat(String(v||'0').replace('%','')); return Number.isFinite(n)?n:0; })();
+      ramPercentHistory.value.push(r); if (ramPercentHistory.value.length > maxPoints) ramPercentHistory.value.shift();
+    };
 
     const fetchDevices = async () => {
       try {
@@ -247,6 +314,8 @@ export default {
         const data = await realtimeService.getData(50);
         realtimeMessages.value = data.data || [];
         isOnline.value = true;
+        const lastMsg = realtimeMessages.value.filter(m => m.raspberry_id == selectedDeviceId.value).slice(-1)[0];
+        if (lastMsg) pushChartPoint(lastMsg);
       } catch {
         error.value = 'Erro ao buscar mensagens em tempo real.';
         isOnline.value = false;
@@ -277,12 +346,18 @@ export default {
         if (!data.exists) return;
         const ts = new Date(data.timestamp).getTime();
         if (lastRfidTimestamp.value && ts <= lastRfidTimestamp.value) return;
-        lastRfidUid.value = data.tag_name && data.tag_name !== '<Sem nome>' ? `Olá ${data.tag_name} (UID ${data.uid})` : `RFID detectado: UID ${data.uid}`;
+        const now = Date.now();
+        if (showNameModal.value && data.uid === lastRfidUid.value && (now - lastHandledAt.value) < detectionCooldownMs) {
+          return;
+        }
+        lastHandledAt.value = now;
+        lastRfidUid.value = data.uid;
+        lastRfidDisplay.value = data.tag_name && data.tag_name !== '<Sem nome>' ? `Olá ${data.tag_name} (UID ${data.uid})` : `RFID detectado: UID ${data.uid}`;
         lastRfidTimestamp.value = ts;
         showRfidBanner.value = true;
         if (bannerTimer) clearTimeout(bannerTimer);
         bannerTimer = setTimeout(() => { showRfidBanner.value = false; }, 5000);
-        if (!data.tag_name || data.tag_name === '<Sem nome>') {
+        if ((!data.tag_name || data.tag_name === '<Sem nome>') && !showNameModal.value) {
           openNameModal();
         }
       } catch {}
@@ -340,6 +415,11 @@ export default {
       if (id === selectedDeviceId.value) return;
       selectedDeviceId.value = id;
       externalLedPin.value = 17;
+      // reset charts
+      timeLabels.value = [];
+      cpuTempHistory.value = [];
+      cpuPercentHistory.value = [];
+      ramPercentHistory.value = [];
       
       loading.value = true;
       error.value = null;
@@ -434,9 +514,15 @@ export default {
       normalizeHost,
       toggleLED,
       downloadDb,
+      // charts
+      chartOptions,
+      tempChartData,
+      cpuChartData,
+      ramChartData,
       // RFID
       showRfidBanner,
       lastRfidUid,
+      lastRfidDisplay,
       showNameModal,
       newTagName,
       modalCountdown,
@@ -474,5 +560,6 @@ button {
   width: 100%;
 }
 </style>
+
 
 
