@@ -11,6 +11,7 @@ def get_system_info():
     try:
         mem = psutil.virtual_memory()
         mem_usage = f"{int(mem.used / (1024**2))} MB"
+        mem_percent = float(mem.percent)
         cpu_percent = psutil.cpu_percent(interval=0)
 
         try:
@@ -40,6 +41,7 @@ def get_system_info():
             "cpu_temp": cpu_temp,
             "wifi_status": wifi_status,
             "cpu_percent": cpu_percent,
+            "mem_percent": mem_percent,
             "gpio_used_count": gpio_used_count,
             "spi_buses": spi_buses,
             "i2c_buses": i2c_buses,

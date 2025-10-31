@@ -132,31 +132,30 @@
           </div>
         </div>
 
-        
-      </section>
-
-      <!-- Real-time charts grid -->
-      <section v-if="selectedDeviceId" class="col-span-1 lg:col-span-4">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="bg-white p-4 rounded-lg shadow lg:col-span-2">
-            <h4 class="font-semibold mb-3 text-gray-700">Temperatura (°C)</h4>
-            <div class="chart-container" style="height:320px;">
-              <Line :data="tempChartData" :options="chartOptions" />
+        <!-- Real-time charts grid (inside device details container) -->
+        <div class="mt-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-4 rounded-lg shadow lg:col-span-2">
+              <h4 class="font-semibold mb-3 text-gray-700">Temperatura (°C)</h4>
+              <div class="chart-container" style="height:320px;">
+                <Line :data="tempChartData" :options="chartOptions" />
+              </div>
             </div>
-          </div>
-          <div class="bg-white p-4 rounded-lg shadow">
-            <h4 class="font-semibold mb-3 text-gray-700">CPU (%)</h4>
-            <div class="chart-container" style="height:220px;">
-              <Line :data="cpuChartData" :options="chartOptions" />
+            <div class="bg-white p-4 rounded-lg shadow">
+              <h4 class="font-semibold mb-3 text-gray-700">CPU (%)</h4>
+              <div class="chart-container" style="height:220px;">
+                <Line :data="cpuChartData" :options="chartOptions" />
+              </div>
             </div>
-          </div>
-          <div class="bg-white p-4 rounded-lg shadow">
-            <h4 class="font-semibold mb-3 text-gray-700">RAM (%)</h4>
-            <div class="chart-container" style="height:220px;">
-              <Line :data="ramChartData" :options="chartOptions" />
+            <div class="bg-white p-4 rounded-lg shadow">
+              <h4 class="font-semibold mb-3 text-gray-700">RAM (%)</h4>
+              <div class="chart-container" style="height:220px;">
+                <Line :data="ramChartData" :options="chartOptions" />
+              </div>
             </div>
           </div>
         </div>
+
       </section>
 
       <!-- Loading and Errors -->
@@ -314,7 +313,7 @@ export default {
         const data = await realtimeService.getData(50);
         realtimeMessages.value = data.data || [];
         isOnline.value = true;
-        const lastMsg = realtimeMessages.value.filter(m => m.raspberry_id == selectedDeviceId.value).slice(-1)[0];
+        const lastMsg = realtimeMessages.value.filter(m => (m.raspberry_id || m.id) == selectedDeviceId.value).slice(-1)[0];
         if (lastMsg) pushChartPoint(lastMsg);
       } catch {
         error.value = 'Erro ao buscar mensagens em tempo real.';
@@ -428,7 +427,7 @@ export default {
     };
 
     const filteredRealtimeMessages = computed(() => {
-      return realtimeMessages.value.filter(msg => msg.raspberry_id == selectedDeviceId.value);
+      return realtimeMessages.value.filter(msg => (msg.raspberry_id || msg.id) == selectedDeviceId.value);
     });
 
     const formatDate = (dateStr) => {
