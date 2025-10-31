@@ -11,7 +11,7 @@ from database import (
     RFIDTag, RFIDReadHistory, SessionLocal
 )
 from schemas import (
-    LEDCommand, LEDHistoryResponse, DeviceStatusResponse,
+    LEDCommand, LEDHistoryResponse, DeviceStatusResponse, DeviceStatusHistoryResponse,
     RFIDTagCreate, RFIDTagResponse, RFIDReadHistoryResponse,
     RFIDReadEvent
 )
@@ -19,6 +19,7 @@ from gpio_handler import GPIOController, GPIO_AVAILABLE
 from rfid_handler import init_rfid_handler, get_rfid_handler, cleanup_rfid
 import csv
 import io
+import zipfile
 
 # Inicializar banco de dados
 init_db()
@@ -409,6 +410,56 @@ def export_rfid_history_csv(
     filename = "rfid_history.csv"
     return StreamingResponse(iter([buffer.read()]), media_type="text/csv", headers={
         "Content-Disposition": f"attachment; filename={filename}"
+    })
+
+@app.get("/api/export/db.zip", tags=["Export"])
+def export_database_zip(db: Session = Depends(get_db)):
+    """Exporta todas as tabelas em CSV dentro de um ZIP único."""
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+        # LED History
+        rows = db.query(LEDHistory).order_by(LEDHistory.timestamp.desc()).all()
+        buffer = io.StringIO(); writer = csv.writer(buffer)
+        writer.writerow(["id","raspberry_id","led_type","pin","action","timestamp"]) 
+        for r in rows:
+            writer.writerow([r.id, r.raspberry_id, r.led_type, r.pin, r.action, r.timestamp.isoformat()])
+        zf.writestr("led_history.csv", buffer.getvalue())
+
+        # RFID Tags
+        rows = db.query(RFIDTag).order_by(RFIDTag.created_at.desc()).all()
+        buffer = io.StringIO(); writer = csv.writer(buffer)
+        writer.writerow(["id","uid","name","raspberry_id","created_at","updated_at"]) 
+        for r in rows:
+            writer.writerow([r.id, r.uid, r.name, r.raspberry_id, r.created_at.isoformat(), r.updated_at.isoformat()])
+        zf.writestr("rfid_tags.csv", buffer.getvalue())
+
+        # RFID Read History
+        rows = db.query(RFIDReadHistory).order_by(RFIDReadHistory.timestamp.desc()).all()
+        buffer = io.StringIO(); writer = csv.writer(buffer)
+        writer.writerow(["id","uid","tag_name","raspberry_id","timestamp"]) 
+        for r in rows:
+            writer.writerow([r.id, r.uid, r.tag_name, r.raspberry_id, r.timestamp.isoformat()])
+        zf.writestr("rfid_read_history.csv", buffer.getvalue())
+
+        # Device Status (current)
+        rows = db.query(DeviceStatus).order_by(DeviceStatus.last_update.desc()).all()
+        buffer = io.StringIO(); writer = csv.writer(buffer)
+        writer.writerow(["id","raspberry_id","led_internal_status","led_external_status","wifi_status","mem_usage","cpu_temp","cpu_percent","gpio_used_count","spi_buses","i2c_buses","usb_devices_count","net_bytes_sent","net_bytes_recv","net_ifaces","rfid_reader_status","last_rfid_read","last_update"]) 
+        for r in rows:
+            writer.writerow([r.id, r.raspberry_id, r.led_internal_status, r.led_external_status, r.wifi_status, r.mem_usage, r.cpu_temp, r.cpu_percent, r.gpio_used_count, r.spi_buses, r.i2c_buses, r.usb_devices_count, r.net_bytes_sent, r.net_bytes_recv, r.net_ifaces, r.rfid_reader_status, r.last_rfid_read.isoformat() if r.last_rfid_read else "", r.last_update.isoformat()])
+        zf.writestr("device_status.csv", buffer.getvalue())
+
+        # Device Status History
+        rows = db.query(DeviceStatusHistory).order_by(DeviceStatusHistory.timestamp.desc()).all()
+        buffer = io.StringIO(); writer = csv.writer(buffer)
+        writer.writerow(["id","raspberry_id","led_internal_status","led_external_status","wifi_status","mem_usage","cpu_temp","cpu_percent","gpio_used_count","spi_buses","i2c_buses","usb_devices_count","net_bytes_sent","net_bytes_recv","net_ifaces","rfid_reader_status","last_rfid_read","timestamp"]) 
+        for r in rows:
+            writer.writerow([r.id, r.raspberry_id, r.led_internal_status, r.led_external_status, r.wifi_status, r.mem_usage, r.cpu_temp, r.cpu_percent, r.gpio_used_count, r.spi_buses, r.i2c_buses, r.usb_devices_count, r.net_bytes_sent, r.net_bytes_recv, r.net_ifaces, r.rfid_reader_status, r.last_rfid_read.isoformat() if r.last_rfid_read else "", r.timestamp.isoformat()])
+        zf.writestr("device_status_history.csv", buffer.getvalue())
+
+    mem.seek(0)
+    return StreamingResponse(mem, media_type="application/zip", headers={
+        "Content-Disposition": "attachment; filename=raspberry_db_export.zip"
     })
 
 @app.get("/api/rfid/stats", tags=["RFID"])

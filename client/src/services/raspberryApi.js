@@ -161,6 +161,14 @@ export const rfidService = {
   }
 };
 
+// ============= EXPORT =============
+export const exportService = {
+  downloadDatabaseZip: async () => {
+    const response = await api.get('/api/export/db.zip', { responseType: 'blob' });
+    return response.data; // Blob (zip)
+  }
+};
+
 // ============= SERVIÇOS DE HEALTH CHECK =============
 export const healthService = {
   // Root endpoint (info da API)

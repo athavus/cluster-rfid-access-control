@@ -6,6 +6,7 @@
         <h1 class="text-xl font-semibold text-gray-900">Raspberry Pi IoT Dashboard</h1>
         <div class="flex items-center gap-4">
           <button @click="fetchAllData" class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">Atualizar</button>
+          <button @click="downloadDb" class="px-3 py-1 text-sm bg-blue-100 hover:bg-blue-200 rounded-md">Exportar DB</button>
           <div class="flex items-center gap-2 text-sm font-medium">
             <span class="inline-block w-3 h-3 rounded-full" :class="isOnline ? 'bg-green-500' : 'bg-red-500'" aria-label="Conexão"></span>
             <span>{{ isOnline ? 'Online' : 'Offline' }}</span>
@@ -146,13 +147,31 @@
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
         </svg>
       </div>
+
+      <!-- RFID Banner -->
+      <div v-if="showRfidBanner" class="fixed top-20 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50">
+        RFID detectado: UID {{ lastRfidUid }}
+      </div>
+
+      <!-- RFID Modal -->
+      <div v-if="showNameModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-2">Nomear nova Tag</h3>
+          <p class="text-sm text-gray-600 mb-4">UID: {{ lastRfidUid }} • Fecha em {{ modalCountdown }}s</p>
+          <input type="text" v-model.trim="newTagName" class="w-full border rounded px-3 py-2 mb-4" placeholder="Nome da tag" />
+          <div class="flex justify-end gap-2">
+            <button @click="closeNameModal" class="px-3 py-1 border rounded">Cancelar</button>
+            <button @click="submitTagName" class="px-3 py-1 bg-blue-600 text-white rounded">Salvar</button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { deviceService, ledService, realtimeService, rfidService } from '../services/raspberryApi.js';
+import { deviceService, ledService, realtimeService, rfidService, exportService } from '../services/raspberryApi.js';
 
 export default {
   name: 'RaspberryControl',
@@ -175,6 +194,7 @@ export default {
     const newTagName = ref('');
     const modalCountdown = ref(15);
     let modalTimer = null;
+    let bannerTimer = null;
 
     let refreshTimer = null;
 
@@ -239,9 +259,11 @@ export default {
         if (!data.exists) return;
         const ts = new Date(data.timestamp).getTime();
         if (lastRfidTimestamp.value && ts <= lastRfidTimestamp.value) return;
-        lastRfidUid.value = data.uid;
+        lastRfidUid.value = data.tag_name && data.tag_name !== '<Sem nome>' ? `Olá ${data.tag_name} (UID ${data.uid})` : `RFID detectado: UID ${data.uid}`;
         lastRfidTimestamp.value = ts;
         showRfidBanner.value = true;
+        if (bannerTimer) clearTimeout(bannerTimer);
+        bannerTimer = setTimeout(() => { showRfidBanner.value = false; }, 5000);
         if (!data.tag_name || data.tag_name === '<Sem nome>') {
           openNameModal();
         }
@@ -276,6 +298,23 @@ export default {
         closeNameModal();
       } catch (e) {
         console.error(e);
+      }
+    };
+
+    const downloadDb = async () => {
+      try {
+        const blob = await exportService.downloadDatabaseZip();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'raspberry_db_export.zip';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (e) {
+        console.error(e);
+        error.value = 'Falha ao exportar banco';
       }
     };
 
@@ -376,6 +415,7 @@ export default {
       formatCpuPercent,
       normalizeHost,
       toggleLED,
+      downloadDb,
       // RFID
       showRfidBanner,
       lastRfidUid,
@@ -416,24 +456,5 @@ button {
   width: 100%;
 }
 </style>
-
-<!-- RFID Banner & Modal UI -->
-<template>
-  <div v-if="showRfidBanner" class="fixed top-20 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50">
-    RFID detectado: UID {{ lastRfidUid }}
-  </div>
-
-  <div v-if="showNameModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 w-full max-w-md">
-      <h3 class="text-lg font-semibold mb-2">Nomear nova Tag</h3>
-      <p class="text-sm text-gray-600 mb-4">UID: {{ lastRfidUid }} • Fecha em {{ modalCountdown }}s</p>
-      <input type="text" v-model.trim="newTagName" class="w-full border rounded px-3 py-2 mb-4" placeholder="Nome da tag" />
-      <div class="flex justify-end gap-2">
-        <button @click="closeNameModal" class="px-3 py-1 border rounded">Cancelar</button>
-        <button @click="submitTagName" class="px-3 py-1 bg-blue-600 text-white rounded">Salvar</button>
-      </div>
-    </div>
-  </div>
-</template>
 
 
