@@ -2,13 +2,32 @@ import time
 from controllers.display import draw_ssid_selection, display_message, draw_connecting, draw_success, draw_error
 from controllers.buttons import read_button
 from system.modes.password_input import handle_password_input
-from controllers.wifi import known_connections, connect_to_wifi
+from controllers.wifi import known_connections, connect_to_wifi, list_available_ssids
 
 def handle_ssid_selection(available_ssids):
     index, scroll_offset = 0, 0
     selecting_ssid = True
+    last_scan_time = time.time()
 
     while selecting_ssid:
+        # Atualiza lista de SSIDs a cada 8 segundos
+        now = time.time()
+        if now - last_scan_time >= 8:
+            last_scan_time = now
+            current_selected = available_ssids[index] if available_ssids else None
+            new_list = list_available_ssids()
+            if new_list:
+                available_ssids = new_list
+                if current_selected in available_ssids:
+                    index = available_ssids.index(current_selected)
+                else:
+                    index = min(index, len(available_ssids) - 1)
+                    if index < 0:
+                        index = 0
+                if index < scroll_offset:
+                    scroll_offset = index
+                elif index >= scroll_offset + 4:
+                    scroll_offset = max(0, index - 3)
         if index < scroll_offset:
             scroll_offset = index
         elif index >= scroll_offset + 4:
