@@ -152,7 +152,7 @@
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { deviceService, ledService, realtimeService } from '../services/raspberryApi.js';
+import { deviceService, ledService, realtimeService, rfidService } from '../services/raspberryApi.js';
 
 export default {
   name: 'RaspberryControl',
@@ -168,6 +168,13 @@ export default {
     const realtimeMessages = ref([]);
     const externalLedPin = ref(17);
     const targetHost = ref('');
+    const lastRfidUid = ref(null);
+    const lastRfidTimestamp = ref(null);
+    const showRfidBanner = ref(false);
+    const showNameModal = ref(false);
+    const newTagName = ref('');
+    const modalCountdown = ref(15);
+    let modalTimer = null;
 
     let refreshTimer = null;
 
@@ -223,6 +230,53 @@ export default {
         isOnline.value = false;
       }
       loading.value = false;
+    };
+
+    const pollLastRfid = async () => {
+      if (!selectedDeviceId.value) return;
+      try {
+        const data = await rfidService.getLastRead(selectedDeviceId.value);
+        if (!data.exists) return;
+        const ts = new Date(data.timestamp).getTime();
+        if (lastRfidTimestamp.value && ts <= lastRfidTimestamp.value) return;
+        lastRfidUid.value = data.uid;
+        lastRfidTimestamp.value = ts;
+        showRfidBanner.value = true;
+        if (!data.tag_name || data.tag_name === '<Sem nome>') {
+          openNameModal();
+        }
+      } catch {}
+    };
+
+    const openNameModal = () => {
+      newTagName.value = '';
+      showNameModal.value = true;
+      modalCountdown.value = 15;
+      if (modalTimer) clearInterval(modalTimer);
+      modalTimer = setInterval(() => {
+        modalCountdown.value -= 1;
+        if (modalCountdown.value <= 0) {
+          closeNameModal();
+        }
+      }, 1000);
+    };
+
+    const closeNameModal = () => {
+      showNameModal.value = false;
+      if (modalTimer) {
+        clearInterval(modalTimer);
+        modalTimer = null;
+      }
+    };
+
+    const submitTagName = async () => {
+      if (!lastRfidUid.value || !newTagName.value.trim()) return;
+      try {
+        await rfidService.nameTag(lastRfidUid.value, newTagName.value.trim(), selectedDeviceId.value);
+        closeNameModal();
+      } catch (e) {
+        console.error(e);
+      }
     };
 
     const selectDevice = async (id) => {
@@ -294,6 +348,7 @@ export default {
         if (selectedDeviceId.value) {
           fetchDeviceDetails(selectedDeviceId.value);
           fetchRealtimeMessages();
+          pollLastRfid();
         }
       }, 5000);
     });
@@ -321,6 +376,14 @@ export default {
       formatCpuPercent,
       normalizeHost,
       toggleLED,
+      // RFID
+      showRfidBanner,
+      lastRfidUid,
+      showNameModal,
+      newTagName,
+      modalCountdown,
+      submitTagName,
+      closeNameModal,
       
     };
   }
@@ -353,5 +416,24 @@ button {
   width: 100%;
 }
 </style>
+
+<!-- RFID Banner & Modal UI -->
+<template>
+  <div v-if="showRfidBanner" class="fixed top-20 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50">
+    RFID detectado: UID {{ lastRfidUid }}
+  </div>
+
+  <div v-if="showNameModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-full max-w-md">
+      <h3 class="text-lg font-semibold mb-2">Nomear nova Tag</h3>
+      <p class="text-sm text-gray-600 mb-4">UID: {{ lastRfidUid }} • Fecha em {{ modalCountdown }}s</p>
+      <input type="text" v-model.trim="newTagName" class="w-full border rounded px-3 py-2 mb-4" placeholder="Nome da tag" />
+      <div class="flex justify-end gap-2">
+        <button @click="closeNameModal" class="px-3 py-1 border rounded">Cancelar</button>
+        <button @click="submitTagName" class="px-3 py-1 bg-blue-600 text-white rounded">Salvar</button>
+      </div>
+    </div>
+  </div>
+</template>
 
 

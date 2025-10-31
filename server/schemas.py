@@ -85,3 +85,27 @@ class DeviceStatusResponse(BaseModel):
         return cls(**data)
 
 
+class DeviceStatusHistoryResponse(BaseModel):
+    id: int
+    raspberry_id: str
+    led_internal_status: bool
+    led_external_status: bool
+    wifi_status: str
+    mem_usage: str
+    cpu_temp: str
+    cpu_percent: float
+    gpio_used_count: int
+    spi_buses: int
+    i2c_buses: int
+    usb_devices_count: int
+    net_bytes_sent: int
+    net_bytes_recv: int
+    net_ifaces: List[str]
+    rfid_reader_status: str
+    last_rfid_read: Optional[datetime]
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+

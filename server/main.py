@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -6,7 +7,7 @@ from datetime import datetime, timedelta
 from consumer import start_consumer_thread
 from shared import received_messages
 from database import (
-    get_db, init_db, LEDHistory, DeviceStatus, 
+    get_db, init_db, LEDHistory, DeviceStatus, DeviceStatusHistory,
     RFIDTag, RFIDReadHistory, SessionLocal
 )
 from schemas import (
@@ -16,6 +17,8 @@ from schemas import (
 )
 from gpio_handler import GPIOController, GPIO_AVAILABLE
 from rfid_handler import init_rfid_handler, get_rfid_handler, cleanup_rfid
+import csv
+import io
 
 # Inicializar banco de dados
 init_db()
@@ -102,6 +105,32 @@ def control_led(command: LEDCommand, db: Session = Depends(get_db)):
     
     db.add(history)
     db.commit()
+
+    # Salvar snapshot contínuo do status do dispositivo
+    try:
+        if device:
+            snapshot = DeviceStatusHistory(
+                raspberry_id=device.raspberry_id,
+                led_internal_status=device.led_internal_status,
+                led_external_status=device.led_external_status,
+                wifi_status=device.wifi_status,
+                mem_usage=device.mem_usage,
+                cpu_temp=device.cpu_temp,
+                cpu_percent=device.cpu_percent,
+                gpio_used_count=device.gpio_used_count,
+                spi_buses=device.spi_buses,
+                i2c_buses=device.i2c_buses,
+                usb_devices_count=device.usb_devices_count,
+                net_bytes_sent=device.net_bytes_sent,
+                net_bytes_recv=device.net_bytes_recv,
+                net_ifaces=device.net_ifaces,
+                rfid_reader_status=device.rfid_reader_status,
+                last_rfid_read=device.last_rfid_read
+            )
+            db.add(snapshot)
+            db.commit()
+    except Exception as e:
+        print(f"[DeviceHistory] Falha ao salvar snapshot: {e}")
     
     return {
         "message": f"LED {led_type} {'ligado' if led_state else 'desligado'}",
@@ -211,6 +240,35 @@ def receive_rfid_read(read_event: RFIDReadEvent, db: Session = Depends(get_db)):
             db.add(device)
         
         db.commit()
+
+        # Snapshot contínuo do status do dispositivo
+        try:
+            device_snapshot_source = db.query(DeviceStatus).filter(
+                DeviceStatus.raspberry_id == read_event.raspberry_id
+            ).first()
+            if device_snapshot_source:
+                snapshot = DeviceStatusHistory(
+                    raspberry_id=device_snapshot_source.raspberry_id,
+                    led_internal_status=device_snapshot_source.led_internal_status,
+                    led_external_status=device_snapshot_source.led_external_status,
+                    wifi_status=device_snapshot_source.wifi_status,
+                    mem_usage=device_snapshot_source.mem_usage,
+                    cpu_temp=device_snapshot_source.cpu_temp,
+                    cpu_percent=device_snapshot_source.cpu_percent,
+                    gpio_used_count=device_snapshot_source.gpio_used_count,
+                    spi_buses=device_snapshot_source.spi_buses,
+                    i2c_buses=device_snapshot_source.i2c_buses,
+                    usb_devices_count=device_snapshot_source.usb_devices_count,
+                    net_bytes_sent=device_snapshot_source.net_bytes_sent,
+                    net_bytes_recv=device_snapshot_source.net_bytes_recv,
+                    net_ifaces=device_snapshot_source.net_ifaces,
+                    rfid_reader_status=device_snapshot_source.rfid_reader_status,
+                    last_rfid_read=device_snapshot_source.last_rfid_read
+                )
+                db.add(snapshot)
+                db.commit()
+        except Exception as e:
+            print(f"[DeviceHistory] Snapshot após RFID falhou: {e}")
         
         return {
             "status": "success",
@@ -309,6 +367,50 @@ def get_rfid_read_history(
     history = query.order_by(RFIDReadHistory.timestamp.desc()).limit(limit).all()
     return history
 
+@app.get("/api/rfid/last", tags=["RFID"])
+def get_last_rfid_read(
+    raspberry_id: str = Query(..., description="Raspberry ID"),
+    db: Session = Depends(get_db)
+):
+    """Retorna a última leitura RFID para a Raspberry especificada"""
+    record = db.query(RFIDReadHistory).filter(
+        RFIDReadHistory.raspberry_id == raspberry_id
+    ).order_by(RFIDReadHistory.timestamp.desc()).first()
+    if not record:
+        return {"exists": False}
+    return {
+        "exists": True,
+        "uid": record.uid,
+        "tag_name": record.tag_name,
+        "raspberry_id": record.raspberry_id,
+        "timestamp": record.timestamp
+    }
+
+@app.get("/api/rfid/history.csv", tags=["RFID"])
+def export_rfid_history_csv(
+    raspberry_id: Optional[str] = Query(None),
+    hours: int = Query(24),
+    db: Session = Depends(get_db)
+):
+    """Exporta o histórico de leituras RFID em CSV"""
+    since = datetime.utcnow() - timedelta(hours=hours)
+    query = db.query(RFIDReadHistory).filter(RFIDReadHistory.timestamp >= since)
+    if raspberry_id:
+        query = query.filter(RFIDReadHistory.raspberry_id == raspberry_id)
+    rows = query.order_by(RFIDReadHistory.timestamp.desc()).all()
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["timestamp", "raspberry_id", "uid", "tag_name"]) 
+    for r in rows:
+        writer.writerow([r.timestamp.isoformat(), r.raspberry_id, r.uid, r.tag_name])
+    buffer.seek(0)
+
+    filename = "rfid_history.csv"
+    return StreamingResponse(iter([buffer.read()]), media_type="text/csv", headers={
+        "Content-Disposition": f"attachment; filename={filename}"
+    })
+
 @app.get("/api/rfid/stats", tags=["RFID"])
 def get_rfid_stats(
     raspberry_id: Optional[str] = Query(None),
@@ -353,6 +455,20 @@ def get_device_status(raspberry_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
     
     return DeviceStatusResponse.from_orm(device)
+
+@app.get("/api/devices/{raspberry_id}/status/history", response_model=List[DeviceStatusHistoryResponse], tags=["Device Status"])
+def get_device_status_history(
+    raspberry_id: str,
+    hours: int = Query(24, le=720),
+    limit: int = Query(500, le=5000),
+    db: Session = Depends(get_db)
+):
+    since = datetime.utcnow() - timedelta(hours=hours)
+    rows = db.query(DeviceStatusHistory).filter(
+        DeviceStatusHistory.raspberry_id == raspberry_id,
+        DeviceStatusHistory.timestamp >= since
+    ).order_by(DeviceStatusHistory.timestamp.desc()).limit(limit).all()
+    return rows
 
 # ==================== REAL-TIME DATA ENDPOINTS ====================
 

@@ -143,6 +143,24 @@ export const realtimeService = {
   }
 };
 
+// ============= SERVIÇOS DE RFID =============
+export const rfidService = {
+  getLastRead: async (raspberryId) => {
+    const response = await api.get('/api/rfid/last', { params: { raspberry_id: raspberryId } });
+    return response.data;
+  },
+  nameTag: async (uid, name, raspberryId) => {
+    const response = await api.post('/api/rfid/tag', { uid, name, raspberry_id: raspberryId });
+    return response.data;
+  },
+  downloadHistoryCsv: async (raspberryId = null, hours = 24) => {
+    const params = { hours };
+    if (raspberryId) params.raspberry_id = raspberryId;
+    const response = await api.get('/api/rfid/history.csv', { params, responseType: 'blob' });
+    return response.data; // Blob
+  }
+};
+
 // ============= SERVIÇOS DE HEALTH CHECK =============
 export const healthService = {
   // Root endpoint (info da API)

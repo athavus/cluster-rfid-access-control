@@ -58,6 +58,28 @@ class DeviceStatus(Base):
     last_rfid_read = Column(DateTime, nullable=True)  # Última leitura RFID
     last_update = Column(DateTime, default=datetime.utcnow)
 
+class DeviceStatusHistory(Base):
+    """Histórico contínuo de status do dispositivo para relatórios"""
+    __tablename__ = "device_status_history"
+    id = Column(Integer, primary_key=True, index=True)
+    raspberry_id = Column(String, index=True)
+    led_internal_status = Column(Boolean, default=False)
+    led_external_status = Column(Boolean, default=False)
+    wifi_status = Column(String, default="unknown")
+    mem_usage = Column(String, default="0 MB")
+    cpu_temp = Column(String, default="0°C")
+    cpu_percent = Column(Float, default=0.0)
+    gpio_used_count = Column(Integer, default=0)
+    spi_buses = Column(Integer, default=0)
+    i2c_buses = Column(Integer, default=0)
+    usb_devices_count = Column(Integer, default=0)
+    net_bytes_sent = Column(Integer, default=0)
+    net_bytes_recv = Column(Integer, default=0)
+    net_ifaces = Column(Text, default="[]")
+    rfid_reader_status = Column(String, default="offline")
+    last_rfid_read = Column(DateTime, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 
