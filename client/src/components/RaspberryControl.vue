@@ -132,29 +132,7 @@
           </div>
         </div>
 
-        <!-- Real-time charts grid (inside device details container) -->
-        <div class="mt-6">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white p-4 rounded-lg shadow lg:col-span-2">
-              <h4 class="font-semibold mb-3 text-gray-700">Temperatura (°C)</h4>
-              <div class="chart-container" style="height:320px;">
-                <Line :data="tempChartData" :options="chartOptions" />
-              </div>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow">
-              <h4 class="font-semibold mb-3 text-gray-700">CPU (%)</h4>
-              <div class="chart-container" style="height:220px;">
-                <Line :data="cpuChartData" :options="chartOptions" />
-              </div>
-            </div>
-            <div class="bg-white p-4 rounded-lg shadow">
-              <h4 class="font-semibold mb-3 text-gray-700">RAM (%)</h4>
-              <div class="chart-container" style="height:220px;">
-                <Line :data="ramChartData" :options="chartOptions" />
-              </div>
-            </div>
-          </div>
-        </div>
+        
 
       </section>
 
@@ -171,23 +149,6 @@
         </svg>
       </div>
 
-      <!-- RFID Banner -->
-      <div v-if="showRfidBanner" class="fixed top-20 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50">
-        {{ lastRfidDisplay }}
-      </div>
-
-      <!-- RFID Modal -->
-      <div v-if="showNameModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-          <h3 class="text-lg font-semibold mb-2">Nomear nova Tag</h3>
-          <p class="text-sm text-gray-600 mb-4">UID: {{ lastRfidUid }} • Fecha em {{ modalCountdown }}s</p>
-          <input type="text" v-model.trim="newTagName" class="w-full border rounded px-3 py-2 mb-4" placeholder="Nome da tag" />
-          <div class="flex justify-end gap-2">
-            <button @click="closeNameModal" class="px-3 py-1 border rounded">Cancelar</button>
-            <button @click="submitTagName" class="px-3 py-1 bg-blue-600 text-white rounded">Salvar</button>
-          </div>
-        </div>
-      </div>
 
       <!-- RFID Banner -->
       <div v-if="showRfidBanner" class="fixed top-20 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50">
@@ -212,15 +173,11 @@
 
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { Line } from 'vue-chartjs';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { deviceService, ledService, realtimeService, rfidService, exportService } from '../services/raspberryApi.js';
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 export default {
   name: 'RaspberryControl',
-  components: { Line },
+  components: {},
   setup() {
     const loading = ref(false);
     const error = ref(null);
@@ -245,42 +202,9 @@ export default {
     const lastHandledAt = ref(0);
 
     let refreshTimer = null;
+    const lastRealtimeTs = ref(0);
 
-    // Charts state
-    const timeLabels = ref([]);
-    const cpuTempHistory = ref([]);
-    const cpuPercentHistory = ref([]);
-    const ramPercentHistory = ref([]);
-    const chartOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: true, position: 'top' } },
-      scales: { y: { beginAtZero: true } }
-    };
-    const tempChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [{ label: 'CPU Temp °C', data: cpuTempHistory.value, borderColor: 'rgb(239,68,68)', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.3, fill: true }]
-    }));
-    const cpuChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [{ label: 'CPU %', data: cpuPercentHistory.value, borderColor: 'rgb(59,130,246)', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, fill: true }]
-    }));
-    const ramChartData = computed(() => ({
-      labels: timeLabels.value,
-      datasets: [{ label: 'RAM %', data: ramPercentHistory.value, borderColor: 'rgb(34,197,94)', backgroundColor: 'rgba(34,197,94,0.1)', tension: 0.3, fill: true }]
-    }));
-    const pushChartPoint = (msg) => {
-      const nowLabel = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const maxPoints = 30;
-      timeLabels.value.push(nowLabel);
-      if (timeLabels.value.length > maxPoints) timeLabels.value.shift();
-      const t = parseFloat(String((msg.cpu_temp ?? msg.temp ?? '0')).toString().replace('°C','').replace('C','').trim()) || 0;
-      cpuTempHistory.value.push(t); if (cpuTempHistory.value.length > maxPoints) cpuTempHistory.value.shift();
-      const c = (()=>{ const v = msg.cpu_percent ?? msg.cpu ?? 0; const n = parseFloat(String(v).replace('%','')); return Number.isFinite(n)?n:0; })();
-      cpuPercentHistory.value.push(c); if (cpuPercentHistory.value.length > maxPoints) cpuPercentHistory.value.shift();
-      const r = (()=>{ const v = msg.mem_percent ?? msg.ram_percent ?? msg.mem_usage_percent; const n = parseFloat(String(v||'0').replace('%','')); return Number.isFinite(n)?n:0; })();
-      ramPercentHistory.value.push(r); if (ramPercentHistory.value.length > maxPoints) ramPercentHistory.value.shift();
-    };
+    // Charts removidos
 
     const fetchDevices = async () => {
       try {
@@ -313,8 +237,7 @@ export default {
         const data = await realtimeService.getData(50);
         realtimeMessages.value = data.data || [];
         isOnline.value = true;
-        const lastMsg = realtimeMessages.value.filter(m => (m.raspberry_id || m.id) == selectedDeviceId.value).slice(-1)[0];
-        if (lastMsg) pushChartPoint(lastMsg);
+        // charts removidos
       } catch {
         error.value = 'Erro ao buscar mensagens em tempo real.';
         isOnline.value = false;
