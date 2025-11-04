@@ -26,7 +26,12 @@
 
       <LoadingOverlay :loading="loading" />
       <ErrorBanner :error="error" @dismiss="error = null" />
-      <RfidBanner :show="showRfidBanner" :message="lastRfidDisplay" />
+      <RfidBanner 
+        :show="showRfidBanner" 
+        :uid="lastRfidUid"
+        :tag-name="lastRfidTagName"
+        @close="closeRfidBanner"
+      />
       <RfidNameModal
         :show="showNameModal"
         :uid="lastRfidUid"
@@ -72,6 +77,7 @@ export default {
     const externalLedPin = ref(17);
     const targetHost = ref('');
     const lastRfidUid = ref(null);
+    const lastRfidTagName = ref(null);
     const lastRfidDisplay = ref('');
     const lastRfidTimestamp = ref(null);
     const showRfidBanner = ref(false);
@@ -155,11 +161,13 @@ export default {
         }
         lastHandledAt.value = now;
         lastRfidUid.value = data.uid;
+        lastRfidTagName.value = data.tag_name || null;
         lastRfidDisplay.value = data.tag_name && data.tag_name !== '<Sem nome>' ? `Olá ${data.tag_name} (UID ${data.uid})` : `RFID detectado: UID ${data.uid}`;
         lastRfidTimestamp.value = ts;
         showRfidBanner.value = true;
+        // Aumentar o tempo de exibição do modal para 8 segundos já que é mais importante
         if (bannerTimer) clearTimeout(bannerTimer);
-        bannerTimer = setTimeout(() => { showRfidBanner.value = false; }, 5000);
+        bannerTimer = setTimeout(() => { showRfidBanner.value = false; }, 8000);
         if ((!data.tag_name || data.tag_name === '<Sem nome>') && !showNameModal.value) {
           openNameModal();
         }
@@ -183,6 +191,14 @@ export default {
       if (modalTimer) {
         clearInterval(modalTimer);
         modalTimer = null;
+      }
+    };
+
+    const closeRfidBanner = () => {
+      showRfidBanner.value = false;
+      if (bannerTimer) {
+        clearTimeout(bannerTimer);
+        bannerTimer = null;
       }
     };
 
@@ -286,11 +302,13 @@ export default {
       // RFID
       showRfidBanner,
       lastRfidUid,
+      lastRfidTagName,
       lastRfidDisplay,
       showNameModal,
       modalCountdown,
       submitTagName,
-      closeNameModal
+      closeNameModal,
+      closeRfidBanner
     };
   }
 };
