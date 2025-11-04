@@ -1,8 +1,23 @@
 import axios from 'axios';
 
+// Detecta automaticamente o hostname atual (funciona mesmo mudando de rede/IP)
+// Esta função detecta o hostname do navegador e usa a porta 8000 para a API
+// Exemplo: se você acessa http://192.168.130.9:5173, a API será http://192.168.130.9:8000
+// Se mudar para outra rede com IP 192.168.1.50, automaticamente usará http://192.168.1.50:8000
+const getApiBaseURL = () => {
+  // Se estiver rodando no navegador, usa o hostname atual (detecta automaticamente o IP)
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:8000`;
+  }
+  // Fallback para localhost se não estiver no navegador (ex: testes)
+  return 'http://localhost:8000';
+};
+
 // Configuração base da API
 const api = axios.create({
-  baseURL: 'http://192.168.130.9:8000', // Endereço do FastAPI
+  baseURL: getApiBaseURL(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

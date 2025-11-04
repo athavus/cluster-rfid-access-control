@@ -40,13 +40,14 @@ app = FastAPI(
     version="3.0.0"
 )
 
-# CORS amplo para permitir controle entre placas (ambiente local)
+# CORS amplo para permitir qualquer origem (funciona mesmo mudando de rede/IP)
+# Isso permite que o frontend acesse a API independente do IP ou hostname
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Aceita qualquer origem
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_methods=["*"],  # Permite todos os métodos HTTP
+    allow_headers=["*"]   # Permite todos os headers
 )
 
 # ==================== LED ENDPOINTS ====================
