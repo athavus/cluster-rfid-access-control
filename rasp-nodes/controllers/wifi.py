@@ -135,6 +135,7 @@ def connect_to_wifi(ssid, password):
     ----------------------------------------------------------------------
     """
     import time
+    import shlex
     
     # Validação básica
     if not ssid or not ssid.strip():
@@ -143,13 +144,18 @@ def connect_to_wifi(ssid, password):
     try:
         # Se já existe conexão conhecida, apenas ativa
         if ssid in known_connections():
-            cmd = f"sudo nmcli con up '{ssid}'"
+            # Usa shlex.quote para escape seguro de caracteres especiais
+            ssid_quoted = shlex.quote(ssid)
+            cmd = f"sudo nmcli con up {ssid_quoted}"
             try:
                 subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, timeout=30)
-                # Aguarda um pouco e verifica se realmente conectou
-                time.sleep(3)
-                if get_connected_ssid() == ssid:
-                    return True
+                # Aguarda mais tempo para conexão estabelecer
+                time.sleep(5)
+                # Verifica múltiplas vezes
+                for check in range(10):
+                    if get_connected_ssid() == ssid:
+                        return True
+                    time.sleep(1)
             except:
                 pass
             # Se falhou, continua para recriar a conexão
@@ -166,97 +172,86 @@ def connect_to_wifi(ssid, password):
         if not password or not password.strip():
             return False
         
-        # Método 1: Remove conexão existente se houver (para evitar conflitos)
+        # Remove conexão existente se houver (para evitar conflitos)
         try:
+            ssid_quoted = shlex.quote(ssid)
             subprocess.run(
-                f"sudo nmcli con delete '{ssid}'",
+                f"sudo nmcli con delete {ssid_quoted}",
                 shell=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=5
             )
-            time.sleep(0.5)  # Pequena pausa após deletar
+            time.sleep(1)  # Pausa maior após deletar
         except:
             pass  # Ignora se não existir ou der erro
         
-        # Método 2: Tenta primeiro criar a conexão e depois ativar (mais confiável)
-        # Este método especifica todas as propriedades explicitamente
+        # Método 1: Tenta criar conexão e depois ativar (mais confiável)
         try:
-            # Remove qualquer conexão existente primeiro
-            try:
-                subprocess.run(
-                    f"sudo nmcli con delete '{ssid}'",
-                    shell=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    timeout=3
-                )
-            except:
-                pass
+            # Usa shlex.quote para escape seguro (inclui espaços e caracteres especiais)
+            ssid_quoted = shlex.quote(ssid)
+            password_quoted = shlex.quote(password)
             
-            # Cria nova conexão usando connection add (mais confiável)
-            # Usa aspas simples para proteger SSID e senha, e escapa aspas dentro delas
-            ssid_escaped = ssid.replace("'", "'\\''")
-            password_escaped = password.replace("'", "'\\''")
-            
+            # Cria nova conexão usando connection add
             cmd = (
                 f"sudo nmcli connection add "
                 f"type wifi "
-                f"con-name '{ssid_escaped}' "
-                f"ssid '{ssid_escaped}' "
+                f"con-name {ssid_quoted} "
+                f"ssid {ssid_quoted} "
                 f"wifi-sec.key-mgmt wpa-psk "
-                f"wifi-sec.psk '{password_escaped}'"
+                f"wifi-sec.psk {password_quoted}"
             )
-            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=10)
+            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=15)
             
-            # Aguarda um pouco antes de tentar ativar
-            time.sleep(1)
+            # Aguarda antes de tentar ativar
+            time.sleep(2)
             
             # Ativa a conexão criada
-            cmd = f"sudo nmcli con up '{ssid_escaped}'"
-            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=30)
+            cmd = f"sudo nmcli con up {ssid_quoted}"
+            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=45)
             
-            # Aguarda a conexão ser estabelecida (pode levar alguns segundos)
-            for attempt in range(15):  # Tenta até 15 vezes (15 segundos)
+            # Aguarda a conexão ser estabelecida (aumentado tempo de espera)
+            # Redes podem levar mais tempo, especialmente com senha incorreta
+            for attempt in range(25):  # Aumentado para 25 segundos
                 time.sleep(1)
                 connected_ssid = get_connected_ssid()
                 if connected_ssid == ssid:
                     return True
             
-            # Última verificação após esperar mais um pouco
-            time.sleep(3)
+            # Verificação adicional após esperar mais
+            time.sleep(5)
             if get_connected_ssid() == ssid:
                 return True
             
             return False
             
         except subprocess.CalledProcessError as e:
-            # Se falhar, tenta método alternativo com connection add
+            # Se falhar, tenta método alternativo
             pass
         
-        # Método 3: Última tentativa - usa dev wifi connect (método mais direto)
+        # Método 2: Última tentativa - usa dev wifi connect (método mais direto)
         try:
-            # Escapa caracteres especiais usando método diferente
-            ssid_safe = ssid.replace("'", "'\"'\"'")
-            password_safe = password.replace("'", "'\"'\"'")
+            # Usa shlex.quote para escape seguro
+            ssid_quoted = shlex.quote(ssid)
+            password_quoted = shlex.quote(password)
             
             # Tenta conectar diretamente usando dev wifi connect
             cmd = (
-                f"sudo nmcli dev wifi connect '{ssid_safe}' "
-                f"password '{password_safe}' "
+                f"sudo nmcli dev wifi connect {ssid_quoted} "
+                f"password {password_quoted} "
                 f"wifi-sec.key-mgmt wpa-psk"
             )
-            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=30)
+            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=45)
             
-            # Aguarda a conexão ser estabelecida
-            for attempt in range(15):
+            # Aguarda a conexão ser estabelecida com mais tempo
+            for attempt in range(25):
                 time.sleep(1)
                 connected_ssid = get_connected_ssid()
                 if connected_ssid == ssid:
                     return True
             
-            # Última verificação
-            time.sleep(3)
+            # Verificação adicional
+            time.sleep(5)
             if get_connected_ssid() == ssid:
                 return True
             

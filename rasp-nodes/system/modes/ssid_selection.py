@@ -63,7 +63,9 @@ def handle_ssid_selection(available_ssids):
                     # Retorna (success, message) sendo message o IP buscável na tela seguinte
                     return (True, "")
                 else:
-                    return (False, "Senha incorreta ou falha")
+                    # Mensagem de erro mais específica
+                    # Se a rede tem senha mas a conexão falhou, pode ser senha incorreta ou timeout
+                    return (False, "Senha incorreta ou rede indisponivel")
 
             handle_password_input(selected_ssid, on_connect_callback=on_connect)
             selecting_ssid = False
