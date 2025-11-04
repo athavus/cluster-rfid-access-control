@@ -125,6 +125,8 @@ def connect_to_wifi(ssid, password):
     Esta função especifica explicitamente o tipo de autenticação (key-mgmt)
     para evitar erros com versões mais recentes do NetworkManager, especialmente
     o erro "802-11-wireless-security.key-mgmt: property is missing".
+    
+    A função aguarda a conexão ser estabelecida e verifica o status antes de retornar.
 
     @param ssid: Nome da rede Wi-Fi.
     @param password: Senha da rede Wi-Fi.
@@ -132,12 +134,25 @@ def connect_to_wifi(ssid, password):
     @return True se a conexão foi bem-sucedida, False em caso de erro.
     ----------------------------------------------------------------------
     """
+    import time
+    
+    # Validação básica
+    if not ssid or not ssid.strip():
+        return False
+    
     try:
         # Se já existe conexão conhecida, apenas ativa
         if ssid in known_connections():
             cmd = f"sudo nmcli con up '{ssid}'"
-            subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, timeout=30)
-            return True
+            try:
+                subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, timeout=30)
+                # Aguarda um pouco e verifica se realmente conectou
+                time.sleep(3)
+                if get_connected_ssid() == ssid:
+                    return True
+            except:
+                pass
+            # Se falhou, continua para recriar a conexão
         
         # Detecta o tipo de segurança da rede
         security_type = get_wifi_security_type(ssid)
@@ -147,10 +162,12 @@ def connect_to_wifi(ssid, password):
         if security_type == '802.1X':
             return False
         
-        # Método preferido: cria conexão usando 'connection add' com todas as propriedades
-        # Isso especifica explicitamente o key-mgmt, resolvendo o problema
+        # Se não tem senha e não é conhecida, retorna False
+        if not password or not password.strip():
+            return False
+        
+        # Método 1: Remove conexão existente se houver (para evitar conflitos)
         try:
-            # Remove conexão existente se houver (para evitar conflitos)
             subprocess.run(
                 f"sudo nmcli con delete '{ssid}'",
                 shell=True,
@@ -158,45 +175,100 @@ def connect_to_wifi(ssid, password):
                 stderr=subprocess.DEVNULL,
                 timeout=5
             )
+            time.sleep(0.5)  # Pequena pausa após deletar
         except:
             pass  # Ignora se não existir ou der erro
         
-        # Cria nova conexão especificando explicitamente wifi-sec.key-mgmt wpa-psk
-        # Isso resolve o erro "key-mgmt: property is missing" em versões recentes do NetworkManager
-        cmd = (
-            f"sudo nmcli connection add "
-            f"type wifi "
-            f"con-name '{ssid}' "
-            f"ssid '{ssid}' "
-            f"wifi-sec.key-mgmt wpa-psk "
-            f"wifi-sec.psk '{password}'"
-        )
-        subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, timeout=10)
-        
-        # Ativa a conexão criada
-        cmd = f"sudo nmcli con up '{ssid}'"
-        subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, timeout=30)
-        
-        return True
-        
-    except subprocess.CalledProcessError:
-        # Se falhar com o método principal, tenta método alternativo
+        # Método 2: Tenta primeiro criar a conexão e depois ativar (mais confiável)
+        # Este método especifica todas as propriedades explicitamente
         try:
-            # Método alternativo: usa dev wifi connect mas especificando key-mgmt
-            # Escapa caracteres especiais no SSID e senha para evitar problemas
-            ssid_escaped = ssid.replace("'", "'\"'\"'")
-            password_escaped = password.replace("'", "'\"'\"'")
+            # Remove qualquer conexão existente primeiro
+            try:
+                subprocess.run(
+                    f"sudo nmcli con delete '{ssid}'",
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=3
+                )
+            except:
+                pass
+            
+            # Cria nova conexão usando connection add (mais confiável)
+            # Usa aspas simples para proteger SSID e senha, e escapa aspas dentro delas
+            ssid_escaped = ssid.replace("'", "'\\''")
+            password_escaped = password.replace("'", "'\\''")
             
             cmd = (
-                f"sudo nmcli dev wifi connect '{ssid_escaped}' "
-                f"password '{password_escaped}' "
+                f"sudo nmcli connection add "
+                f"type wifi "
+                f"con-name '{ssid_escaped}' "
+                f"ssid '{ssid_escaped}' "
+                f"wifi-sec.key-mgmt wpa-psk "
+                f"wifi-sec.psk '{password_escaped}'"
+            )
+            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=10)
+            
+            # Aguarda um pouco antes de tentar ativar
+            time.sleep(1)
+            
+            # Ativa a conexão criada
+            cmd = f"sudo nmcli con up '{ssid_escaped}'"
+            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=30)
+            
+            # Aguarda a conexão ser estabelecida (pode levar alguns segundos)
+            for attempt in range(15):  # Tenta até 15 vezes (15 segundos)
+                time.sleep(1)
+                connected_ssid = get_connected_ssid()
+                if connected_ssid == ssid:
+                    return True
+            
+            # Última verificação após esperar mais um pouco
+            time.sleep(3)
+            if get_connected_ssid() == ssid:
+                return True
+            
+            return False
+            
+        except subprocess.CalledProcessError as e:
+            # Se falhar, tenta método alternativo com connection add
+            pass
+        
+        # Método 3: Última tentativa - usa dev wifi connect (método mais direto)
+        try:
+            # Escapa caracteres especiais usando método diferente
+            ssid_safe = ssid.replace("'", "'\"'\"'")
+            password_safe = password.replace("'", "'\"'\"'")
+            
+            # Tenta conectar diretamente usando dev wifi connect
+            cmd = (
+                f"sudo nmcli dev wifi connect '{ssid_safe}' "
+                f"password '{password_safe}' "
                 f"wifi-sec.key-mgmt wpa-psk"
             )
-            subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, timeout=30)
-            return True
-        except:
+            subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=30)
+            
+            # Aguarda a conexão ser estabelecida
+            for attempt in range(15):
+                time.sleep(1)
+                connected_ssid = get_connected_ssid()
+                if connected_ssid == ssid:
+                    return True
+            
+            # Última verificação
+            time.sleep(3)
+            if get_connected_ssid() == ssid:
+                return True
+            
             return False
-    except Exception:
+            
+        except subprocess.CalledProcessError:
+            pass
+        
+        # Se todos os métodos falharam, retorna False
+        return False
+        
+    except Exception as e:
         return False
 
 
