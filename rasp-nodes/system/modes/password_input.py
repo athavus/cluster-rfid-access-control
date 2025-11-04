@@ -47,6 +47,10 @@ def password_input_mode(ssid, on_connect_callback=None):
     Retorna:
     - (success: bool, password: str ou None)
     """
+    print(f"\n[Password Input] Iniciando modo de entrada de senha")
+    print(f"[Password Input] SSID: '{ssid}'")
+    print(f"[Password Input] Callback fornecido: {'Sim' if on_connect_callback else 'Não'}")
+    
     password = ""
     cursor_pos = 0  # Posição na roleta de caracteres
     last_update = time.time()
@@ -87,25 +91,33 @@ def password_input_mode(ssid, on_connect_callback=None):
                 elif current_char in SUBMIT_CHARS:
                     if len(password) == 0:
                         # Nada digitado → cancelar
+                        print(f"[Password Input] Cancelado: senha vazia")
                         return (False, None)
 
                     # Confirma conexão
+                    print(f"\n[Password Input] Senha confirmada para SSID '{ssid}'")
+                    print(f"[Password Input] Tamanho da senha: {len(password)} caracteres")
                     draw_connecting(ssid)
                     
                     if on_connect_callback:
+                        print(f"[Password Input] Chamando callback on_connect_callback...")
                         success, message = on_connect_callback(ssid, password)
+                        print(f"[Password Input] Callback retornou: success={success}, message='{message}'")
                         
                         if success:
+                            print(f"[Password Input] ✓ Conexão bem-sucedida!")
                             draw_success(ssid, message)
                             time.sleep(2)
                             return (True, password)
                         else:
+                            print(f"[Password Input] ✗ Erro na conexão: {message}")
                             draw_error(message)
                             time.sleep(2)
                             # Volta para edição
                             draw_password_roulette(ssid, password, CHARSET, cursor_pos)
                     else:
                         # Modo teste - sempre sucesso
+                        print(f"[Password Input] Modo teste - sem callback, retornando sucesso")
                         return (True, password)
 
                 # Senão, adiciona caractere à senha

@@ -42,31 +42,52 @@ def handle_ssid_selection(available_ssids):
             index = (index + 1) % len(available_ssids)
         elif btn == 'ok':
             selected_ssid = available_ssids[index]
+            print(f"\n[SSID Selection] SSID selecionado: '{selected_ssid}'")
 
             # Se rede já é conhecida, tenta conectar direto (pula senha)
-            if selected_ssid in known_connections():
+            known_conns = known_connections()
+            print(f"[SSID Selection] Conexões conhecidas: {known_conns}")
+            
+            if selected_ssid in known_conns:
+                print(f"[SSID Selection] Rede '{selected_ssid}' é conhecida, conectando sem senha...")
                 draw_connecting(selected_ssid)
                 success = connect_to_wifi(selected_ssid, "")
+                print(f"[SSID Selection] Resultado da conexão (rede conhecida): {success}")
                 if success:
                     # Mostra sucesso (IP será mostrado pela próxima tela de status)
+                    print(f"[SSID Selection] ✓ Conexão bem-sucedida!")
                     draw_success(selected_ssid)
                 else:
+                    print(f"[SSID Selection] ✗ Falha na conexão")
                     draw_error("Falha ao conectar")
                 time.sleep(2)
                 selecting_ssid = False
                 continue
 
             # Caso contrário, pede senha e conecta
+            print(f"[SSID Selection] Rede '{selected_ssid}' não é conhecida, solicitando senha...")
             def on_connect(ssid, password):
+                print(f"\n[SSID Selection] Callback on_connect chamado!")
+                print(f"[SSID Selection] SSID: '{ssid}'")
+                print(f"[SSID Selection] Senha recebida: {'Sim (***)' if password else 'Não'}")
+                print(f"[SSID Selection] Chamando connect_to_wifi...")
+                
                 ok = connect_to_wifi(ssid, password)
+                
+                print(f"[SSID Selection] Resultado de connect_to_wifi: {ok}")
+                
                 if ok:
                     # Retorna (success, message) sendo message o IP buscável na tela seguinte
+                    print(f"[SSID Selection] ✓ Retornando sucesso ao password_input")
                     return (True, "")
                 else:
                     # Mensagem de erro mais específica
                     # Se a rede tem senha mas a conexão falhou, pode ser senha incorreta ou timeout
+                    print(f"[SSID Selection] ✗ Retornando erro ao password_input")
                     return (False, "Senha incorreta ou rede indisponivel")
 
+            print(f"[SSID Selection] Iniciando handle_password_input...")
             handle_password_input(selected_ssid, on_connect_callback=on_connect)
+            print(f"[SSID Selection] handle_password_input retornou")
             selecting_ssid = False
 
