@@ -223,14 +223,16 @@ def connect_to_wifi(ssid, password):
             print(f"[WiFi] SSID escapado: {ssid_quoted}")
             print(f"[WiFi] Criando nova conexão...")
             
-            # Cria nova conexão usando connection add
+            # Cria nova conexão usando connection add com sintaxe correta
+            # Usa 802-11-wireless-security.psk ao invés de wifi-sec.psk para garantir compatibilidade
             cmd = (
                 f"sudo nmcli connection add "
                 f"type wifi "
                 f"con-name {ssid_quoted} "
+                f"ifname '*' "
                 f"ssid {ssid_quoted} "
-                f"wifi-sec.key-mgmt wpa-psk "
-                f"wifi-sec.psk {password_quoted}"
+                f"802-11-wireless-security.key-mgmt wpa-psk "
+                f"802-11-wireless-security.psk {password_quoted}"
             )
             print(f"[WiFi] Comando criar conexão: {cmd[:100]}... (senha oculta)")
             
@@ -281,18 +283,84 @@ def connect_to_wifi(ssid, password):
             import traceback
             print(f"[WiFi] Traceback: {traceback.format_exc()}")
         
-        # Método 2: Última tentativa - usa dev wifi connect (método mais direto)
-        print(f"[WiFi] === MÉTODO 2: Conexão direta (dev wifi connect) ===")
+        # Método 2: Tenta criar conexão sem senha e depois modificar com senha
+        print(f"[WiFi] === MÉTODO 2: Criar conexão e modificar com senha ===")
+        try:
+            ssid_quoted = shlex.quote(ssid)
+            password_quoted = shlex.quote(password)
+            
+            # Primeiro cria conexão sem senha
+            print(f"[WiFi] Criando conexão sem senha inicialmente...")
+            cmd = (
+                f"sudo nmcli connection add "
+                f"type wifi "
+                f"con-name {ssid_quoted} "
+                f"ifname '*' "
+                f"ssid {ssid_quoted}"
+            )
+            print(f"[WiFi] Comando: {cmd}")
+            result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=15)
+            print(f"[WiFi] ✓ Conexão criada")
+            
+            # Agora modifica para adicionar segurança e senha
+            print(f"[WiFi] Adicionando segurança WPA-PSK e senha...")
+            cmd = (
+                f"sudo nmcli connection modify {ssid_quoted} "
+                f"802-11-wireless-security.key-mgmt wpa-psk "
+                f"802-11-wireless-security.psk {password_quoted}"
+            )
+            print(f"[WiFi] Comando modificar: {cmd[:100]}... (senha oculta)")
+            result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=15)
+            print(f"[WiFi] ✓ Segurança e senha adicionadas")
+            
+            time.sleep(2)
+            
+            # Ativa a conexão
+            cmd = f"sudo nmcli con up {ssid_quoted}"
+            print(f"[WiFi] Ativando conexão: {cmd}")
+            result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=45)
+            print(f"[WiFi] ✓ Comando de ativação executado")
+            
+            # Aguarda conexão
+            print(f"[WiFi] Aguardando conexão ser estabelecida (até 25 segundos)...")
+            for attempt in range(25):
+                time.sleep(1)
+                connected_ssid = get_connected_ssid()
+                print(f"[WiFi] Tentativa {attempt+1}/25: SSID conectado = '{connected_ssid}'")
+                if connected_ssid == ssid:
+                    print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 2) ✓✓✓")
+                    return True
+            
+            time.sleep(5)
+            final_ssid = get_connected_ssid()
+            print(f"[WiFi] SSID final: '{final_ssid}'")
+            if final_ssid == ssid:
+                print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 2, verificação adicional) ✓✓✓")
+                return True
+            
+            print(f"[WiFi] ✗ Método 2 falhou")
+            
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr.decode('utf-8') if e.stderr else str(e)
+            print(f"[WiFi] ✗ ERRO no Método 2: {error_msg}")
+            print(f"[WiFi] Código de retorno: {e.returncode}")
+        except Exception as e:
+            print(f"[WiFi] ✗ EXCEÇÃO no Método 2: {e}")
+            import traceback
+            print(f"[WiFi] Traceback: {traceback.format_exc()}")
+        
+        # Método 3: Última tentativa - usa dev wifi connect (método mais direto)
+        print(f"[WiFi] === MÉTODO 3: Conexão direta (dev wifi connect) ===")
         try:
             # Usa shlex.quote para escape seguro
             ssid_quoted = shlex.quote(ssid)
             password_quoted = shlex.quote(password)
             
             # Tenta conectar diretamente usando dev wifi connect
+            # O comando dev wifi connect não aceita wifi-sec.key-mgmt como argumento separado
             cmd = (
                 f"sudo nmcli dev wifi connect {ssid_quoted} "
-                f"password {password_quoted} "
-                f"wifi-sec.key-mgmt wpa-psk"
+                f"password {password_quoted}"
             )
             print(f"[WiFi] Comando conexão direta: {cmd[:100]}... (senha oculta)")
             
@@ -307,7 +375,7 @@ def connect_to_wifi(ssid, password):
                 connected_ssid = get_connected_ssid()
                 print(f"[WiFi] Tentativa {attempt+1}/25: SSID conectado = '{connected_ssid}'")
                 if connected_ssid == ssid:
-                    print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 2) ✓✓✓")
+                    print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 3) ✓✓✓")
                     return True
             
             # Verificação adicional
@@ -316,18 +384,18 @@ def connect_to_wifi(ssid, password):
             final_ssid = get_connected_ssid()
             print(f"[WiFi] SSID final após verificação adicional: '{final_ssid}'")
             if final_ssid == ssid:
-                print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 2, verificação adicional) ✓✓✓")
+                print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 3, verificação adicional) ✓✓✓")
                 return True
             
-            print(f"[WiFi] ✗ Método 2 falhou: não conseguiu conectar após todas as tentativas")
+            print(f"[WiFi] ✗ Método 3 falhou: não conseguiu conectar após todas as tentativas")
             print(f"[WiFi] SSID esperado: '{ssid}', SSID atual: '{final_ssid}'")
             
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.decode('utf-8') if e.stderr else str(e)
-            print(f"[WiFi] ✗ ERRO no Método 2: {error_msg}")
+            print(f"[WiFi] ✗ ERRO no Método 3: {error_msg}")
             print(f"[WiFi] Código de retorno: {e.returncode}")
         except Exception as e:
-            print(f"[WiFi] ✗ EXCEÇÃO no Método 2: {e}")
+            print(f"[WiFi] ✗ EXCEÇÃO no Método 3: {e}")
             import traceback
             print(f"[WiFi] Traceback: {traceback.format_exc()}")
         
