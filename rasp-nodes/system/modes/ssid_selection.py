@@ -44,12 +44,12 @@ def handle_ssid_selection(available_ssids):
             selected_ssid = available_ssids[index]
             print(f"\n[SSID Selection] SSID selecionado: '{selected_ssid}'")
 
-            # Se rede já é conhecida, tenta conectar direto (pula senha)
+            # Se rede já é conhecida, tenta conectar direto primeiro (pula senha)
             known_conns = known_connections()
             print(f"[SSID Selection] Conexões conhecidas: {known_conns}")
             
             if selected_ssid in known_conns:
-                print(f"[SSID Selection] Rede '{selected_ssid}' é conhecida, conectando sem senha...")
+                print(f"[SSID Selection] Rede '{selected_ssid}' é conhecida, tentando conectar sem senha primeiro...")
                 draw_connecting(selected_ssid)
                 success = connect_to_wifi(selected_ssid, "")
                 print(f"[SSID Selection] Resultado da conexão (rede conhecida): {success}")
@@ -57,12 +57,13 @@ def handle_ssid_selection(available_ssids):
                     # Mostra sucesso (IP será mostrado pela próxima tela de status)
                     print(f"[SSID Selection] ✓ Conexão bem-sucedida!")
                     draw_success(selected_ssid)
+                    time.sleep(2)
+                    selecting_ssid = False
+                    continue
                 else:
-                    print(f"[SSID Selection] ✗ Falha na conexão")
-                    draw_error("Falha ao conectar")
-                time.sleep(2)
-                selecting_ssid = False
-                continue
+                    # Se falhou, pede senha mesmo sendo conhecida (pode ter senha incorreta salva)
+                    print(f"[SSID Selection] ✗ Conexão conhecida falhou, pedindo senha...")
+                    # Continua para pedir senha abaixo
 
             # Caso contrário, pede senha e conecta
             print(f"[SSID Selection] Rede '{selected_ssid}' não é conhecida, solicitando senha...")
