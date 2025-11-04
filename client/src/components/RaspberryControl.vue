@@ -1,172 +1,39 @@
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-      <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-        <h1 class="text-xl font-semibold text-gray-900">Raspberry Pi IoT Dashboard</h1>
-        <div class="flex items-center gap-4">
-          <button @click="fetchAllData" class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">Atualizar</button>
-          <button @click="downloadDb" class="px-3 py-1 text-sm bg-blue-100 hover:bg-blue-200 rounded-md">Exportar DB</button>
-          <div class="flex items-center gap-2 text-sm font-medium">
-            <span class="inline-block w-3 h-3 rounded-full" :class="isOnline ? 'bg-green-500' : 'bg-red-500'" aria-label="Conexão"></span>
-            <span>{{ isOnline ? 'Online' : 'Offline' }}</span>
-          </div>
-        </div>
-      </div>
-    </header>
+    <DashboardHeader 
+      :is-online="isOnline" 
+      @refresh="fetchAllData"
+      @export-db="downloadDb"
+    />
 
     <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <DeviceSelector
+        :devices="devices"
+        :selected-device-id="selectedDeviceId"
+        @select-device="selectDevice"
+      />
 
-      <!-- Device Selector -->
-      <section class="col-span-1 bg-white rounded-lg shadow p-4 overflow-auto max-h-[calc(100vh-128px)]">
-        <h2 class="font-semibold text-gray-800 mb-4">Dispositivos</h2>
-        <ul class="space-y-2">
-          <li v-for="device in devices" :key="device.raspberry_id">
-            <button
-              @click="selectDevice(device.raspberry_id)"
-              type="button"
-              class="w-full text-left px-4 py-2 rounded-md cursor-pointer transition-colors"
-              :class="selectedDeviceId === device.raspberry_id ? 'bg-blue-500 text-white' : 'hover:bg-blue-50 text-gray-700'"
-            >
-              Raspberry ID: {{ device.raspberry_id }}
-            </button>
-          </li>
-        </ul>
-      </section>
+      <DeviceDetails
+        :device-details="selectedDeviceDetails"
+        :device-id="selectedDeviceId"
+        :external-led-pin="externalLedPin"
+        :target-host="targetHost"
+        :loading="loading"
+        @update:externalLedPin="externalLedPin = $event"
+        @update:targetHost="targetHost = $event"
+        @toggle-led="toggleLED"
+      />
 
-      <!-- Device Details -->
-      <section
-        v-if="selectedDeviceDetails"
-        class="col-span-3 bg-white rounded-lg shadow p-6 overflow-auto max-h-[calc(100vh-128px)]"
-      >
-        <h2 class="text-lg font-semibold mb-4">Detalhes do Dispositivo: {{ selectedDeviceId }}</h2>
-
-        <!-- LED Externo Status + Controle -->
-        <div class="mb-6 max-w-md p-4 rounded-md bg-green-50">
-          <h3 class="font-semibold text-green-700 mb-2">LED Externo</h3>
-          <p>
-            Status:
-            <span :class="ledStatusClasses(selectedDeviceDetails.led_external_status)">
-              {{ selectedDeviceDetails.led_external_status ? 'ON' : 'OFF' }}
-            </span>
-          </p>
-          <p>Última atualização: {{ formatDate(selectedDeviceDetails.last_update) }}</p>
-
-          <div class="mt-3">
-            <label class="block text-sm text-green-900 mb-1">Pino GPIO (BCM) do LED externo</label>
-            <input
-              type="number"
-              class="w-32 px-2 py-1 border rounded"
-              :min="0"
-              :max="27"
-              v-model.number="externalLedPin"
-            />
-          </div>
-
-          <div class="mt-3">
-            <label class="block text-sm text-green-900 mb-1">IP do dispositivo alvo (ex.: 192.168.130.166)</label>
-            <input
-              type="text"
-              class="w-64 px-2 py-1 border rounded"
-              placeholder="192.168.130.166"
-              v-model.trim="targetHost"
-            />
-            <p class="mt-1 text-xs text-green-700">Somente LED usa este IP. Porta 8000 será assumida se omitida.</p>
-          </div>
-
-          <div class="mt-4 flex gap-4">
-            <button
-              @click="toggleLED('ON')"
-              :disabled="loading"
-              class="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition-all hover:scale-105 active:scale-95"
-            >
-              Ligar
-            </button>
-            <button
-              @click="toggleLED('OFF')"
-              :disabled="loading"
-              class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all hover:scale-105 active:scale-95"
-            >
-              Desligar
-            </button>
-          </div>
-        </div>
-
-        <!-- Device Status Info -->
-        <div class="grid grid-cols-3 gap-6 mb-6 text-gray-700">
-          <div>
-            <h4 class="font-semibold mb-1">WiFi Status</h4>
-            <p>{{ selectedDeviceDetails.wifi_status || 'Desconhecido' }}</p>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-1">Uso de Memória</h4>
-            <p>{{ selectedDeviceDetails.mem_usage || 'Desconhecido' }}</p>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-1">Temperatura CPU</h4>
-            <p>{{ selectedDeviceDetails.cpu_temp || 'Desconhecido' }}</p>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-1">% CPU</h4>
-            <p>{{ formatCpuPercent(selectedDeviceDetails.cpu_percent) }}%</p>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-1">GPIO usados</h4>
-            <p>{{ selectedDeviceDetails.gpio_used_count }}</p>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-1">SPI Buses</h4>
-            <p>{{ selectedDeviceDetails.spi_buses }}</p>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-1">I2C Buses</h4>
-            <p>{{ selectedDeviceDetails.i2c_buses }}</p>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-1">USB Devices</h4>
-            <p>{{ selectedDeviceDetails.usb_devices_count }}</p>
-          </div>
-          <div>
-            <h4 class="font-semibold mb-1">Interfaces de Rede</h4>
-            <p>{{ selectedDeviceDetails.net_ifaces.join(', ') || 'Nenhuma' }}</p>
-          </div>
-        </div>
-
-        
-
-      </section>
-
-      <!-- Loading and Errors -->
-      <div v-if="error" class="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50">
-        {{ error }}
-        <button @click="error = null" class="ml-4 font-bold">×</button>
-      </div>
-
-      <div v-if="loading" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
-        <svg class="animate-spin h-12 w-12 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-        </svg>
-      </div>
-
-
-      <!-- RFID Banner -->
-      <div v-if="showRfidBanner" class="fixed top-20 right-4 bg-blue-600 text-white px-4 py-2 rounded shadow-lg z-50">
-        {{ lastRfidDisplay }}
-      </div>
-
-      <!-- RFID Modal -->
-      <div v-if="showNameModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-          <h3 class="text-lg font-semibold mb-2">Nomear nova Tag</h3>
-          <p class="text-sm text-gray-600 mb-4">UID: {{ lastRfidUid }} • Fecha em {{ modalCountdown }}s</p>
-          <input type="text" v-model.trim="newTagName" class="w-full border rounded px-3 py-2 mb-4" placeholder="Nome da tag" />
-          <div class="flex justify-end gap-2">
-            <button @click="closeNameModal" class="px-3 py-1 border rounded">Cancelar</button>
-            <button @click="submitTagName" class="px-3 py-1 bg-blue-600 text-white rounded">Salvar</button>
-          </div>
-        </div>
-      </div>
+      <LoadingOverlay :loading="loading" />
+      <ErrorBanner :error="error" @dismiss="error = null" />
+      <RfidBanner :show="showRfidBanner" :message="lastRfidDisplay" />
+      <RfidNameModal
+        :show="showNameModal"
+        :uid="lastRfidUid"
+        :countdown="modalCountdown"
+        @submit="submitTagName"
+        @cancel="closeNameModal"
+      />
     </main>
   </div>
 </template>
@@ -174,10 +41,25 @@
 <script>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { deviceService, ledService, realtimeService, rfidService, exportService } from '../services/raspberryApi.js';
+import DashboardHeader from './DashboardHeader.vue';
+import DeviceSelector from './DeviceSelector.vue';
+import DeviceDetails from './DeviceDetails.vue';
+import LoadingOverlay from './LoadingOverlay.vue';
+import ErrorBanner from './ErrorBanner.vue';
+import RfidBanner from './RfidBanner.vue';
+import RfidNameModal from './RfidNameModal.vue';
 
 export default {
   name: 'RaspberryControl',
-  components: {},
+  components: {
+    DashboardHeader,
+    DeviceSelector,
+    DeviceDetails,
+    LoadingOverlay,
+    ErrorBanner,
+    RfidBanner,
+    RfidNameModal
+  },
   setup() {
     const loading = ref(false);
     const error = ref(null);
@@ -194,7 +76,6 @@ export default {
     const lastRfidTimestamp = ref(null);
     const showRfidBanner = ref(false);
     const showNameModal = ref(false);
-    const newTagName = ref('');
     const modalCountdown = ref(15);
     let modalTimer = null;
     let bannerTimer = null;
@@ -286,7 +167,6 @@ export default {
     };
 
     const openNameModal = () => {
-      newTagName.value = '';
       showNameModal.value = true;
       modalCountdown.value = 15;
       if (modalTimer) clearInterval(modalTimer);
@@ -306,10 +186,10 @@ export default {
       }
     };
 
-    const submitTagName = async () => {
-      if (!lastRfidUid.value || !newTagName.value.trim()) return;
+    const submitTagName = async (tagName) => {
+      if (!lastRfidUid.value || !tagName) return;
       try {
-        await rfidService.nameTag(lastRfidUid.value, newTagName.value.trim(), selectedDeviceId.value);
+        await rfidService.nameTag(lastRfidUid.value, tagName, selectedDeviceId.value);
         closeNameModal();
       } catch (e) {
         console.error(e);
@@ -337,11 +217,6 @@ export default {
       if (id === selectedDeviceId.value) return;
       selectedDeviceId.value = id;
       externalLedPin.value = 17;
-      // reset charts
-      timeLabels.value = [];
-      cpuTempHistory.value = [];
-      cpuPercentHistory.value = [];
-      ramPercentHistory.value = [];
       
       loading.value = true;
       error.value = null;
@@ -352,30 +227,6 @@ export default {
     const filteredRealtimeMessages = computed(() => {
       return realtimeMessages.value.filter(msg => (msg.raspberry_id || msg.id) == selectedDeviceId.value);
     });
-
-    const formatDate = (dateStr) => {
-      if (!dateStr) return 'N/A';
-      return new Date(dateStr).toLocaleString('pt-BR');
-    };
-
-    const ledStatusClasses = (statusBoolean) => {
-      return statusBoolean ? 'text-green-600 font-semibold' : 'text-gray-500 font-normal';
-    };
-
-    const stringifyMessage = (msg) => {
-      try {
-        return JSON.stringify(msg, null, 2);
-      } catch {
-        return String(msg);
-      }
-    };
-
-    const formatCpuPercent = (value) => {
-      if (typeof value === 'number') return value.toFixed(1);
-      const parsed = parseFloat(String(value ?? '').replace('%', '').trim());
-      if (!Number.isFinite(parsed)) return '0.0';
-      return parsed.toFixed(1);
-    };
 
     const normalizeHost = (raw) => {
       if (!raw) return null;
@@ -429,10 +280,6 @@ export default {
       filteredRealtimeMessages,
       fetchAllData,
       selectDevice,
-      formatDate,
-      ledStatusClasses,
-      stringifyMessage,
-      formatCpuPercent,
       normalizeHost,
       toggleLED,
       downloadDb,
@@ -441,11 +288,9 @@ export default {
       lastRfidUid,
       lastRfidDisplay,
       showNameModal,
-      newTagName,
       modalCountdown,
       submitTagName,
-      closeNameModal,
-      
+      closeNameModal
     };
   }
 };

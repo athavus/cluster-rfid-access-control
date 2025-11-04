@@ -1,0 +1,61 @@
+<template>
+  <div class="grid grid-cols-3 gap-6 mb-6 text-gray-700">
+    <div>
+      <h4 class="font-semibold mb-1">WiFi Status</h4>
+      <p>{{ deviceDetails.wifi_status || 'Desconhecido' }}</p>
+    </div>
+    <div>
+      <h4 class="font-semibold mb-1">Uso de Memória</h4>
+      <p>{{ deviceDetails.mem_usage || 'Desconhecido' }}</p>
+    </div>
+    <div>
+      <h4 class="font-semibold mb-1">Temperatura CPU</h4>
+      <p>{{ deviceDetails.cpu_temp || 'Desconhecido' }}</p>
+    </div>
+    <div>
+      <h4 class="font-semibold mb-1">% CPU</h4>
+      <p>{{ formatCpuPercent(deviceDetails.cpu_percent) }}%</p>
+    </div>
+    <div>
+      <h4 class="font-semibold mb-1">GPIO usados</h4>
+      <p>{{ deviceDetails.gpio_used_count }}</p>
+    </div>
+    <div>
+      <h4 class="font-semibold mb-1">SPI Buses</h4>
+      <p>{{ deviceDetails.spi_buses }}</p>
+    </div>
+    <div>
+      <h4 class="font-semibold mb-1">I2C Buses</h4>
+      <p>{{ deviceDetails.i2c_buses }}</p>
+    </div>
+    <div>
+      <h4 class="font-semibold mb-1">USB Devices</h4>
+      <p>{{ deviceDetails.usb_devices_count }}</p>
+    </div>
+    <div>
+      <h4 class="font-semibold mb-1">Interfaces de Rede</h4>
+      <p>{{ deviceDetails.net_ifaces?.join(', ') || 'Nenhuma' }}</p>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'DeviceStatusGrid',
+  props: {
+    deviceDetails: {
+      type: Object,
+      required: true
+    }
+  },
+  methods: {
+    formatCpuPercent(value) {
+      if (typeof value === 'number') return value.toFixed(1);
+      const parsed = parseFloat(String(value ?? '').replace('%', '').trim());
+      if (!Number.isFinite(parsed)) return '0.0';
+      return parsed.toFixed(1);
+    }
+  }
+};
+</script>
+
