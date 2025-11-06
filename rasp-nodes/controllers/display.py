@@ -262,18 +262,50 @@ def draw_error(message):
 def draw_logo():
     """Exibe a logo da apresentação."""
     try:
-        from assets.logo_bitmap import logo_bitmap_bytes
+        from assets.logo_bitmap import logo_bitmap_bytes, LOGO_WIDTH, LOGO_HEIGHT, LOGO_BYTES_PER_ROW
         
         # Limpa a tela
         draw.rectangle((0, 0, width, height), outline=0, fill=0)
         
-        # Tenta converter byte array para imagem
-        # Formato SSD1306: cada byte representa 8 pixels verticais consecutivos
-        # Para 128x64: são 128 colunas * 8 linhas por byte = 1024 bytes
-        if len(logo_bitmap_bytes) == 1024:
-            # Converte byte array para imagem PIL
-            # Formato: para cada coluna x, bytes são organizados verticalmente
-            # Cada byte representa 8 pixels verticais (LSB no topo)
+        # Detecta formato do byte array
+        # Formato image2cpp (horizontal): 109x64 = 896 bytes (14 bytes por linha * 64 linhas)
+        # Formato SSD1306 (vertical): 128x64 = 1024 bytes
+        
+        # Formato image2cpp: horizontal packing, MSB primeiro
+        # Detecta pelo tamanho do array e dimensões
+        expected_bytes = LOGO_BYTES_PER_ROW * LOGO_HEIGHT
+        if (len(logo_bitmap_bytes) >= expected_bytes - 20 or 
+            (LOGO_WIDTH == 109 and LOGO_HEIGHT == 64)):
+            # Formato image2cpp: horizontal packing, MSB primeiro
+            # Cada linha tem LOGO_BYTES_PER_ROW bytes
+            logo_img = Image.new("1", (LOGO_WIDTH, LOGO_HEIGHT))
+            pixels = logo_img.load()
+            
+            for y in range(LOGO_HEIGHT):
+                for x_byte in range(LOGO_BYTES_PER_ROW):
+                    byte_idx = y * LOGO_BYTES_PER_ROW + x_byte
+                    if byte_idx < len(logo_bitmap_bytes):
+                        byte_val = logo_bitmap_bytes[byte_idx]
+                    else:
+                        byte_val = 0  # Preenche com zeros se faltar bytes
+                    
+                    # Cada byte representa 8 pixels horizontais (MSB primeiro)
+                    for bit in range(8):
+                        x = x_byte * 8 + bit
+                        if x < LOGO_WIDTH:
+                            if byte_val & (1 << (7 - bit)):  # MSB primeiro
+                                pixels[x, y] = 1
+                            else:
+                                pixels[x, y] = 0
+            
+            # Centraliza a logo no display (128x64)
+            x_offset = (width - LOGO_WIDTH) // 2
+            y_offset = (height - LOGO_HEIGHT) // 2
+            image.paste(logo_img, (x_offset, y_offset))
+            
+        elif len(logo_bitmap_bytes) == 1024:
+            # Formato SSD1306: vertical packing
+            # Cada byte representa 8 pixels verticais consecutivos (LSB no topo)
             logo_img = Image.new("1", (128, 64))
             pixels = logo_img.load()
             
@@ -290,7 +322,6 @@ def draw_logo():
                                 else:
                                     pixels[x, y] = 0
             
-            # Usa a imagem convertida
             image.paste(logo_img, (0, 0))
         
         # Se tem outro tamanho, tenta tratar como imagem PIL direto
