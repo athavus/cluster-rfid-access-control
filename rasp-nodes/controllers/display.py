@@ -257,3 +257,94 @@ def draw_error(message):
     
     disp.image(image)
     disp.show()
+
+
+def draw_logo():
+    """Exibe a logo da apresentação."""
+    try:
+        from assets.logo_bitmap import logo_bitmap_bytes
+        
+        # Limpa a tela
+        draw.rectangle((0, 0, width, height), outline=0, fill=0)
+        
+        # Tenta converter byte array para imagem
+        # Formato SSD1306: cada byte representa 8 pixels verticais consecutivos
+        # Para 128x64: são 128 colunas * 8 linhas por byte = 1024 bytes
+        if len(logo_bitmap_bytes) == 1024:
+            # Converte byte array para imagem PIL
+            # Formato: para cada coluna x, bytes são organizados verticalmente
+            # Cada byte representa 8 pixels verticais (LSB no topo)
+            logo_img = Image.new("1", (128, 64))
+            pixels = logo_img.load()
+            
+            for x in range(128):
+                for y_page in range(8):  # 64 pixels / 8 = 8 páginas
+                    byte_idx = x + (y_page * 128)
+                    if byte_idx < len(logo_bitmap_bytes):
+                        byte_val = logo_bitmap_bytes[byte_idx]
+                        for bit in range(8):
+                            y = y_page * 8 + bit
+                            if y < 64:
+                                if byte_val & (1 << bit):  # LSB primeiro
+                                    pixels[x, y] = 1
+                                else:
+                                    pixels[x, y] = 0
+            
+            # Usa a imagem convertida
+            image.paste(logo_img, (0, 0))
+        
+        # Se tem outro tamanho, tenta tratar como imagem PIL direto
+        elif len(logo_bitmap_bytes) > 0:
+            try:
+                # Tenta carregar como imagem
+                import io
+                logo_img = Image.open(io.BytesIO(logo_bitmap_bytes))
+                logo_img = logo_img.convert("1").resize((128, 64))
+                
+                # Centraliza
+                x_offset = (width - logo_img.width) // 2
+                y_offset = (height - logo_img.height) // 2
+                image.paste(logo_img, (x_offset, y_offset))
+            except Exception:
+                # Se falhar, exibe texto alternativo
+                draw_centered_text(draw, "RASPBERRY", 20, font=font_title)
+                draw_centered_text(draw, "GATE", 35, font=font_title)
+        else:
+            # Byte array vazio, exibe texto alternativo
+            draw_centered_text(draw, "RASPBERRY", 20, font=font_title)
+            draw_centered_text(draw, "GATE", 35, font=font_title)
+        
+        disp.image(image)
+        disp.show()
+        
+    except ImportError:
+        # Se não conseguir importar, exibe texto alternativo
+        draw.rectangle((0, 0, width, height), outline=0, fill=0)
+        draw_centered_text(draw, "RASPBERRY", 20, font=font_title)
+        draw_centered_text(draw, "GATE", 35, font=font_title)
+        disp.image(image)
+        disp.show()
+    except Exception as e:
+        # Em caso de erro, exibe texto alternativo
+        print(f"Erro ao exibir logo: {e}")
+        draw.rectangle((0, 0, width, height), outline=0, fill=0)
+        draw_centered_text(draw, "RASPBERRY", 20, font=font_title)
+        draw_centered_text(draw, "GATE", 35, font=font_title)
+        disp.image(image)
+        disp.show()
+
+
+def draw_students_names():
+    """Exibe os nomes dos alunos na apresentação."""
+    draw.rectangle((0, 0, width, height), outline=0, fill=0)
+    
+    # Título
+    draw_centered_text(draw, "Desenvolvido por", 5, font=font_normal)
+    
+    # Nomes dos alunos centralizados
+    draw_centered_text(draw, "Miguel Ryan", 25, font=font_title)
+    draw_centered_text(draw, "e", 38, font=font_normal)
+    draw_centered_text(draw, "Guilherme Santos", 50, font=font_title)
+    
+    disp.image(image)
+    disp.show()

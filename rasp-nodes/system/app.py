@@ -16,7 +16,18 @@ def handle_connected_mode():
 
 def run_system():
     try:
-        from controllers.display import display_message, disp
+        from controllers.display import display_message, disp, draw_logo, draw_students_names
+        
+        # Apresentação inicial
+        # Exibe logo por 3.5 segundos
+        draw_logo()
+        time.sleep(3.5)
+        
+        # Exibe nomes dos alunos por 2 segundos
+        draw_students_names()
+        time.sleep(2)
+        
+        # Continua com inicialização normal
         display_message("", "Inicializando...", "Sistema", "", "")
         time.sleep(1)
 
@@ -35,5 +46,9 @@ def run_system():
         time.sleep(1)
         disp.fill(0)
         disp.show()
-        GPIO.cleanup()
+        try:
+            import RPi.GPIO as GPIO
+            GPIO.cleanup()
+        except ImportError:
+            pass  # GPIO não disponível
 
