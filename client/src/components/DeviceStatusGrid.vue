@@ -36,6 +36,16 @@
       <h4 class="font-semibold mb-1">Interfaces de Rede</h4>
       <p>{{ deviceDetails.net_ifaces?.join(', ') || 'Nenhuma' }}</p>
     </div>
+    <div>
+      <h4 class="font-semibold mb-1">Status Fechadura</h4>
+      <p :class="getServoStatusClass(deviceDetails.servo_status)">
+        {{ formatServoStatus(deviceDetails.servo_status) }}
+      </p>
+    </div>
+    <div v-if="deviceDetails.last_door_open">
+      <h4 class="font-semibold mb-1">Última Abertura</h4>
+      <p class="text-sm">{{ formatDate(deviceDetails.last_door_open) }}</p>
+    </div>
   </div>
 </template>
 
@@ -54,6 +64,33 @@ export default {
       const parsed = parseFloat(String(value ?? '').replace('%', '').trim());
       if (!Number.isFinite(parsed)) return '0.0';
       return parsed.toFixed(1);
+    },
+    formatServoStatus(status) {
+      if (!status) return 'Desconhecido';
+      const statusMap = {
+        'closed': 'Fechada',
+        'open': 'Aberta',
+        'moving': 'Movendo'
+      };
+      return statusMap[status] || status;
+    },
+    getServoStatusClass(status) {
+      if (!status) return '';
+      const classMap = {
+        'closed': 'text-gray-600',
+        'open': 'text-green-600 font-semibold',
+        'moving': 'text-yellow-600 font-semibold'
+      };
+      return classMap[status] || '';
+    },
+    formatDate(dateString) {
+      if (!dateString) return 'Nunca';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleString('pt-BR');
+      } catch {
+        return dateString;
+      }
     }
   }
 };

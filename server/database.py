@@ -56,6 +56,8 @@ class DeviceStatus(Base):
     net_ifaces = Column(Text, default="[]")
     rfid_reader_status = Column(String, default="offline")  # Nova coluna para status do RFID
     last_rfid_read = Column(DateTime, nullable=True)  # Última leitura RFID
+    servo_status = Column(String, default="closed")  # closed, open, moving - status do servo/fechadura
+    last_door_open = Column(DateTime, nullable=True)  # Última vez que a porta foi aberta
     last_update = Column(DateTime, default=datetime.utcnow)
 
 class DeviceStatusHistory(Base):
@@ -78,6 +80,16 @@ class DeviceStatusHistory(Base):
     net_ifaces = Column(Text, default="[]")
     rfid_reader_status = Column(String, default="offline")
     last_rfid_read = Column(DateTime, nullable=True)
+    servo_status = Column(String, default="closed")  # closed, open, moving
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+class DoorOpenHistory(Base):
+    """Histórico de aberturas da porta (fechadura)"""
+    __tablename__ = "door_open_history"
+    id = Column(Integer, primary_key=True, index=True)
+    raspberry_id = Column(String, index=True)
+    rfid_uid = Column(String, index=True)  # UID da tag que abriu a porta
+    tag_name = Column(String, default="<Sem nome>")
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
 def init_db():

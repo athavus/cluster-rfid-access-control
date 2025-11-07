@@ -8,15 +8,16 @@ from consumer import start_consumer_thread
 from shared import received_messages
 from database import (
     get_db, init_db, LEDHistory, DeviceStatus, DeviceStatusHistory,
-    RFIDTag, RFIDReadHistory, SessionLocal
+    RFIDTag, RFIDReadHistory, SessionLocal, DoorOpenHistory
 )
 from schemas import (
     LEDCommand, LEDHistoryResponse, DeviceStatusResponse, DeviceStatusHistoryResponse,
     RFIDTagCreate, RFIDTagResponse, RFIDReadHistoryResponse,
-    RFIDReadEvent
+    RFIDReadEvent, ServoCommand, DoorOpenHistoryResponse
 )
 from gpio_handler import GPIOController, GPIO_AVAILABLE
 from rfid_handler import init_rfid_handler, get_rfid_handler, cleanup_rfid
+from servo_handler import init_servo_handler, get_servo_handler, cleanup_servo
 import csv
 import io
 import zipfile
@@ -30,6 +31,50 @@ rfid_handler = get_rfid_handler()
 if rfid_handler:
     # Inicia thread de polling para leitura contínua de tags
     rfid_handler.start_polling(interval=0.3)
+
+# Iniciar Servo handler (fechadura no pino 12)
+init_servo_handler(gpio_pin=12)
+
+# Configurar callback do RFID para abrir a porta quando tag for detectada
+def on_rfid_read(rfid_data: dict):
+    """Callback chamado quando uma tag RFID é detectada"""
+    try:
+        servo = get_servo_handler()
+        if servo:
+            print(f"[Servo] Tag RFID detectada, abrindo porta...")
+            servo.open_door(hold_time=5.0)
+            
+            # Registrar abertura no banco de dados
+            db = SessionLocal()
+            try:
+                # Registrar no histórico de aberturas
+                door_open = DoorOpenHistory(
+                    raspberry_id=rfid_data.get('raspberry_id', '1'),
+                    rfid_uid=rfid_data.get('uid', ''),
+                    tag_name=rfid_data.get('tag_name', '<Sem nome>')
+                )
+                db.add(door_open)
+                
+                # Atualizar status do dispositivo
+                device = db.query(DeviceStatus).filter(
+                    DeviceStatus.raspberry_id == rfid_data.get('raspberry_id', '1')
+                ).first()
+                if device:
+                    device.servo_status = "open"
+                    device.last_door_open = datetime.utcnow()
+                    device.last_update = datetime.utcnow()
+                
+                db.commit()
+            except Exception as e:
+                print(f"[Servo] Erro ao registrar abertura: {e}")
+                db.rollback()
+            finally:
+                db.close()
+    except Exception as e:
+        print(f"[Servo] Erro no callback RFID: {e}")
+
+if rfid_handler:
+    rfid_handler.set_read_callback(on_rfid_read)
 
 # Iniciar consumer do RabbitMQ em thread separada
 start_consumer_thread()
@@ -127,7 +172,8 @@ def control_led(command: LEDCommand, db: Session = Depends(get_db)):
                 net_bytes_recv=device.net_bytes_recv,
                 net_ifaces=device.net_ifaces,
                 rfid_reader_status=device.rfid_reader_status,
-                last_rfid_read=device.last_rfid_read
+                last_rfid_read=device.last_rfid_read,
+                servo_status=device.servo_status or "closed"
             )
             db.add(snapshot)
             db.commit()
@@ -243,6 +289,31 @@ def receive_rfid_read(read_event: RFIDReadEvent, db: Session = Depends(get_db)):
         
         db.commit()
 
+        # Acionar servo para abrir a porta quando RFID é detectado
+        servo = get_servo_handler()
+        if servo:
+            print(f"[Servo] Tag RFID detectada via endpoint, abrindo porta...")
+            servo.open_door(hold_time=5.0)
+            
+            # Registrar abertura no histórico
+            try:
+                door_open = DoorOpenHistory(
+                    raspberry_id=read_event.raspberry_id,
+                    rfid_uid=read_event.uid,
+                    tag_name=read_event.tag_name or "<Sem nome>"
+                )
+                db.add(door_open)
+                
+                # Atualizar status do dispositivo
+                if device:
+                    device.servo_status = "open"
+                    device.last_door_open = datetime.utcnow()
+                
+                db.commit()
+            except Exception as e:
+                print(f"[Servo] Erro ao registrar abertura: {e}")
+                db.rollback()
+
         # Snapshot contínuo do status do dispositivo
         try:
             device_snapshot_source = db.query(DeviceStatus).filter(
@@ -265,7 +336,8 @@ def receive_rfid_read(read_event: RFIDReadEvent, db: Session = Depends(get_db)):
                     net_bytes_recv=device_snapshot_source.net_bytes_recv,
                     net_ifaces=device_snapshot_source.net_ifaces,
                     rfid_reader_status=device_snapshot_source.rfid_reader_status,
-                    last_rfid_read=device_snapshot_source.last_rfid_read
+                    last_rfid_read=device_snapshot_source.last_rfid_read,
+                    servo_status=device_snapshot_source.servo_status or "closed"
                 )
                 db.add(snapshot)
                 db.commit()
@@ -492,6 +564,90 @@ def get_rfid_stats(
         "timestamp": datetime.utcnow()
     }
 
+# ==================== SERVO (FECHADURA) ENDPOINTS ====================
+
+@app.post("/api/servo/open", tags=["Servo Control"])
+def open_door(
+    command: ServoCommand,
+    db: Session = Depends(get_db)
+):
+    """Abre a porta (fechadura) por um período de tempo"""
+    servo = get_servo_handler()
+    if not servo:
+        raise HTTPException(status_code=503, detail="Servo não disponível")
+    
+    if command.action != "open":
+        raise HTTPException(status_code=400, detail="Ação deve ser 'open'")
+    
+    success = servo.open_door(hold_time=command.hold_time or 5.0)
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Erro ao abrir porta")
+    
+    # Registrar no histórico
+    try:
+        door_open = DoorOpenHistory(
+            raspberry_id=command.raspberry_id or "1",
+            rfid_uid="manual",
+            tag_name="Comando manual"
+        )
+        db.add(door_open)
+        
+        # Atualizar status do dispositivo
+        device = db.query(DeviceStatus).filter(
+            DeviceStatus.raspberry_id == command.raspberry_id or "1"
+        ).first()
+        if device:
+            device.servo_status = "open"
+            device.last_door_open = datetime.utcnow()
+            device.last_update = datetime.utcnow()
+        else:
+            device = DeviceStatus(
+                raspberry_id=command.raspberry_id or "1",
+                servo_status="open",
+                last_door_open=datetime.utcnow()
+            )
+            db.add(device)
+        
+        db.commit()
+    except Exception as e:
+        print(f"[Servo] Erro ao registrar abertura manual: {e}")
+        db.rollback()
+    
+    return {
+        "status": "success",
+        "message": f"Porta aberta por {command.hold_time or 5.0} segundos",
+        "raspberry_id": command.raspberry_id or "1",
+        "timestamp": datetime.utcnow()
+    }
+
+@app.get("/api/servo/status", tags=["Servo Control"])
+def get_servo_status():
+    """Retorna o status atual do servo"""
+    servo = get_servo_handler()
+    if not servo:
+        return {
+            "available": False,
+            "message": "Servo não disponível"
+        }
+    
+    return servo.get_status()
+
+@app.get("/api/servo/history", response_model=List[DoorOpenHistoryResponse], tags=["Servo Control"])
+def get_door_open_history(
+    raspberry_id: Optional[str] = Query(None, description="Filtrar por Raspberry ID"),
+    limit: int = Query(100, le=1000),
+    db: Session = Depends(get_db)
+):
+    """Obtém histórico de aberturas da porta"""
+    query = db.query(DoorOpenHistory)
+    
+    if raspberry_id:
+        query = query.filter(DoorOpenHistory.raspberry_id == raspberry_id)
+    
+    history = query.order_by(DoorOpenHistory.timestamp.desc()).limit(limit).all()
+    return history
+
 # ==================== DEVICE STATUS ENDPOINTS ====================
 
 @app.get("/api/devices/status", response_model=List[DeviceStatusResponse], tags=["Device Status"])
@@ -619,6 +775,7 @@ def shutdown_event():
     print("Desligando API...")
     GPIOController.cleanup()
     cleanup_rfid()
+    cleanup_servo()
 
 
 

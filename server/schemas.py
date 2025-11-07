@@ -73,6 +73,8 @@ class DeviceStatusResponse(BaseModel):
     net_ifaces: List[str]
     rfid_reader_status: str
     last_rfid_read: Optional[datetime]
+    servo_status: str  # closed, open, moving
+    last_door_open: Optional[datetime]
     last_update: datetime
 
     class Config:
@@ -103,9 +105,27 @@ class DeviceStatusHistoryResponse(BaseModel):
     net_ifaces: List[str]
     rfid_reader_status: str
     last_rfid_read: Optional[datetime]
+    servo_status: str
     timestamp: datetime
 
     class Config:
         from_attributes = True
+
+class DoorOpenHistoryResponse(BaseModel):
+    """Schema para histórico de aberturas da porta"""
+    id: int
+    raspberry_id: str
+    rfid_uid: str
+    tag_name: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class ServoCommand(BaseModel):
+    """Schema para comando do servo"""
+    action: str  # "open" para abrir a porta
+    hold_time: Optional[float] = 5.0  # Tempo em segundos para manter aberto
+    raspberry_id: Optional[str] = "1"
 
 
