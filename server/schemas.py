@@ -62,6 +62,7 @@ class DeviceStatusResponse(BaseModel):
     led_external_status: bool
     wifi_status: str
     mem_usage: str
+    mem_percent: float  # Novo campo adicionado
     cpu_temp: str
     cpu_percent: float
     gpio_used_count: int
@@ -73,7 +74,7 @@ class DeviceStatusResponse(BaseModel):
     net_ifaces: List[str]
     rfid_reader_status: str
     last_rfid_read: Optional[datetime]
-    servo_status: str  # closed, open, moving
+    servo_status: str
     last_door_open: Optional[datetime]
     last_update: datetime
 
@@ -85,7 +86,6 @@ class DeviceStatusResponse(BaseModel):
         data = obj.__dict__.copy()
         data['net_ifaces'] = json.loads(data.get('net_ifaces', '[]'))
         return cls(**data)
-
 
 class DeviceStatusHistoryResponse(BaseModel):
     id: int

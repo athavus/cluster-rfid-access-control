@@ -11,6 +11,10 @@
         <p>{{ deviceDetails.mem_usage || 'Desconhecido' }}</p>
       </div>
       <div>
+        <h4 class="font-semibold mb-1">Uso de Memória</h4>
+        <p>{{ deviceDetails.mem_percent || 'Desconhecido' }}%</p>
+      </div>
+      <div>
         <h4 class="font-semibold mb-1">Temperatura CPU</h4>
         <p>{{ deviceDetails.cpu_temp || 'Desconhecido' }}</p>
       </div>
@@ -68,7 +72,10 @@
         <div class="bg-white p-4 rounded-lg shadow">
           <div class="flex justify-between items-center mb-3">
             <h4 class="font-semibold text-gray-700">Memória RAM</h4>
-            <span class="text-2xl font-bold text-green-600">{{ currentRamValue }} MB</span>
+            <div class="text-right">
+              <div class="text-2xl font-bold text-green-600">{{ currentRamValue }} MB</div>
+              <div class="text-sm text-gray-500">{{ deviceDetails.mem_percent || 0 }}% / {{ maxRamValue }} MB</div>
+            </div>
           </div>
           <canvas ref="ramCanvas" width="600" height="300" class="w-full"></canvas>
         </div>
@@ -107,8 +114,9 @@ export default {
       maxDataPoints: 30,
       currentRamValue: 0,
       currentTemp: 0,
-      maxRamValue: 2048, // Máximo fixo para o gráfico de RAM em MB (2GB)
-      currentDeviceId: null
+      maxRamValue: 2048, // Será calculado dinamicamente
+      currentDeviceId: null,
+      ramTotalCalculated: false // Flag para não recalcular o máximo de RAM
     };
   },
   computed: {
@@ -153,9 +161,10 @@ export default {
       deep: true
     },
     deviceId(newId, oldId) {
-      // Quando troca de dispositivo, redesenha os gráficos
+      // Quando troca de dispositivo, reinicia o cálculo de RAM
       if (newId !== oldId) {
         this.currentDeviceId = newId;
+        this.ramTotalCalculated = false; // Reseta para recalcular no novo dispositivo
         this.$nextTick(() => {
           this.redrawAllCharts();
         });
@@ -188,6 +197,48 @@ export default {
       this.initializeDeviceHistory(deviceId);
       return this.deviceHistories[deviceId][type];
     },
+    calculateMaxRam(memUsageMB, memPercent) {
+      /**
+       * Calcula a RAM total usando regra de 3
+       * Se memUsageMB é X MB e representa memPercent%
+       * Então maxRam = (memUsageMB * 100) / memPercent
+       */
+      if (!memPercent || memPercent === 0) {
+        return 2048; // fallback
+      }
+      
+      const maxRam = Math.round((memUsageMB * 100) / memPercent);
+      return maxRam;
+    },
+    extractRamMB(memUsageString) {
+      /**
+       * Extrai o valor numérico em MB da string de uso de memória
+       * Exemplos: "454 MB" -> 454, "1.5 GB" -> 1536
+       */
+      if (!memUsageString) return 0;
+      
+      const str = String(memUsageString).trim();
+      
+      // Tenta extrair valor em MB
+      const mbMatch = str.match(/(\d+(?:\.\d+)?)\s*MB/i);
+      if (mbMatch) {
+        return parseFloat(mbMatch[1]);
+      }
+      
+      // Tenta extrair valor em GB e converte para MB
+      const gbMatch = str.match(/(\d+(?:\.\d+)?)\s*GB/i);
+      if (gbMatch) {
+        return parseFloat(gbMatch[1]) * 1024;
+      }
+      
+      // Fallback: tenta extrair apenas o número
+      const numMatch = str.match(/(\d+(?:\.\d+)?)/);
+      if (numMatch) {
+        return parseFloat(numMatch[1]);
+      }
+      
+      return 0;
+    },
     redrawAllCharts() {
       if (this.$refs.cpuCanvas) {
         this.drawChart(this.$refs.cpuCanvas, this.cpuHistory, '#3b82f6', 100);
@@ -203,16 +254,19 @@ export default {
       const cpuValue = parseFloat(this.formatCpuPercent(details.cpu_percent));
       
       // Extrai RAM (em MB)
-      let ramValue = 0;
-      if (details.mem_usage) {
-        const memStr = String(details.mem_usage);
-        // Extrai apenas o número em MB (ex: "454 MB" -> 454)
-        const match = memStr.match(/(\d+(?:\.\d+)?)\s*MB/i);
-        if (match) {
-          ramValue = parseFloat(match[1]);
-        }
+      const ramMB = this.extractRamMB(details.mem_usage);
+      this.currentRamValue = ramMB.toFixed(0);
+      
+      // Calcula o máximo de RAM apenas na primeira vez (quando ramTotalCalculated é false)
+      const memPercent = parseFloat(String(details.mem_percent || 0).replace('%', '').trim());
+      if (!this.ramTotalCalculated && ramMB > 0 && memPercent > 0) {
+        this.maxRamValue = this.calculateMaxRam(ramMB, memPercent);
+        this.ramTotalCalculated = true;
       }
-      this.currentRamValue = ramValue.toFixed(0);
+      
+      // Calcula o valor do RAM para o gráfico usando a porcentagem
+      // ramValueForChart = (memPercent / 100) * maxRamValue
+      const ramValueForChart = (memPercent / 100) * this.maxRamValue;
       
       // Extrai Temperatura
       let tempValue = 0;
@@ -225,7 +279,7 @@ export default {
       // Adiciona novos pontos ao histórico do dispositivo específico
       const history = this.deviceHistories[deviceId];
       history.cpu.push(cpuValue);
-      history.ram.push(ramValue);
+      history.ram.push(ramValueForChart); // Usa o valor calculado pela porcentagem
       history.temp.push(tempValue);
       
       // Remove pontos antigos (mantém apenas os últimos X pontos)

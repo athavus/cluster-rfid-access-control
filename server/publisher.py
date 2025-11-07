@@ -4,7 +4,7 @@ import time
 import psutil  # pip install psutil
 import os
 from glob import glob
-import socket  # para hostname único
+import socket
 
 def get_system_info():
     """Coleta informações do sistema ampliadas"""
@@ -32,16 +32,16 @@ def get_system_info():
         net_bytes_sent = net_io.bytes_sent
         net_bytes_recv = net_io.bytes_recv
 
-        net_ifaces = [iface for iface, addrs in psutil.net_if_addrs().items() if psutil.net_if_stats()[iface].isup]
+        net_ifaces = [iface for iface in psutil.net_if_addrs() if psutil.net_if_stats()[iface].isup]
 
         gpio_used_count = 0
 
         return {
             "mem_usage": mem_usage,
-            "cpu_temp": cpu_temp,
-            "wifi_status": wifi_status,
-            "cpu_percent": cpu_percent,
             "mem_percent": mem_percent,
+            "cpu_temp": cpu_temp,
+            "cpu_percent": cpu_percent,
+            "wifi_status": wifi_status,
             "gpio_used_count": gpio_used_count,
             "spi_buses": spi_buses,
             "i2c_buses": i2c_buses,
@@ -55,9 +55,10 @@ def get_system_info():
         print(f"Erro ao coletar info do sistema: {e}")
         return {
             "mem_usage": "N/A",
+            "mem_percent": 0.0,
             "cpu_temp": "N/A",
-            "wifi_status": "unknown",
             "cpu_percent": 0,
+            "wifi_status": "unknown",
             "gpio_used_count": 0,
             "spi_buses": 0,
             "i2c_buses": 0,
@@ -71,13 +72,13 @@ def publish_health_data():
     try:
         credentials = pika.PlainCredentials('athavus', '1234')
         connection = pika.BlockingConnection(
-            pika.ConnectionParameters('192.168.130.9', 5672, '/', credentials, heartbeat=600)
+            pika.ConnectionParameters('192.168.15.15', 5672, '/', credentials, heartbeat=600)
         )
         channel = connection.channel()
         channel.queue_declare(queue='rasp_data', durable=True)
 
         cont_messages = 0
-        raspberry_id = socket.gethostname()  # ID dinâmico pelo hostname
+        raspberry_id = socket.gethostname()
 
         print(f"Iniciando publicação ampliada de health check para Raspberry {raspberry_id}")
         print("Pressione CTRL+C para parar\n")
@@ -122,4 +123,3 @@ def publish_health_data():
 if __name__ == "__main__":
     cont_messages = publish_health_data()
     print(f"\nTotal de mensagens enviadas: {cont_messages}")
-

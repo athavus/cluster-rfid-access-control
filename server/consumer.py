@@ -19,6 +19,7 @@ def process_raspberry_data(data):
         if device:
             device.wifi_status = data.get("wifi_status", device.wifi_status)
             device.mem_usage = data.get("mem_usage", device.mem_usage)
+            device.mem_percent = data.get("mem_percent", getattr(device, "mem_percent", 0.0))  # Atualizado
             device.cpu_temp = data.get("cpu_temp", device.cpu_temp)
             device.cpu_percent = data.get("cpu_percent", getattr(device, "cpu_percent", None))
             device.gpio_used_count = data.get("gpio_used_count", getattr(device, "gpio_used_count", None))
@@ -34,6 +35,7 @@ def process_raspberry_data(data):
                 raspberry_id=raspberry_id,
                 wifi_status=data.get("wifi_status", "unknown"),
                 mem_usage=data.get("mem_usage", "0 MB"),
+                mem_percent=data.get("mem_percent", 0.0),  # Novo campo adicionado
                 cpu_temp=data.get("cpu_temp", "0°C"),
                 led_internal_status=False,
                 led_external_status=False,

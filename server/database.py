@@ -37,6 +37,7 @@ class RFIDReadHistory(Base):
     raspberry_id = Column(String, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
+
 class DeviceStatus(Base):
     __tablename__ = "device_status"
     id = Column(Integer, primary_key=True, index=True)
@@ -45,6 +46,7 @@ class DeviceStatus(Base):
     led_external_status = Column(Boolean, default=False)
     wifi_status = Column(String, default="unknown")
     mem_usage = Column(String, default="0 MB")
+    mem_percent = Column(Float, default=0.0)
     cpu_temp = Column(String, default="0°C")
     cpu_percent = Column(Float, default=0.0)
     gpio_used_count = Column(Integer, default=0)
@@ -54,10 +56,10 @@ class DeviceStatus(Base):
     net_bytes_sent = Column(Integer, default=0)
     net_bytes_recv = Column(Integer, default=0)
     net_ifaces = Column(Text, default="[]")
-    rfid_reader_status = Column(String, default="offline")  # Nova coluna para status do RFID
-    last_rfid_read = Column(DateTime, nullable=True)  # Última leitura RFID
-    servo_status = Column(String, default="closed")  # closed, open, moving - status do servo/fechadura
-    last_door_open = Column(DateTime, nullable=True)  # Última vez que a porta foi aberta
+    rfid_reader_status = Column(String, default="offline")
+    last_rfid_read = Column(DateTime, nullable=True)
+    servo_status = Column(String, default="closed")
+    last_door_open = Column(DateTime, nullable=True)
     last_update = Column(DateTime, default=datetime.utcnow)
 
 class DeviceStatusHistory(Base):
@@ -69,6 +71,7 @@ class DeviceStatusHistory(Base):
     led_external_status = Column(Boolean, default=False)
     wifi_status = Column(String, default="unknown")
     mem_usage = Column(String, default="0 MB")
+    mem_percent = Column(Float, default=0.0)
     cpu_temp = Column(String, default="0°C")
     cpu_percent = Column(Float, default=0.0)
     gpio_used_count = Column(Integer, default=0)

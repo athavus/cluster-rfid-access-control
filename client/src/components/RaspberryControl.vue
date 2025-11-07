@@ -111,6 +111,7 @@ export default {
       if (!id) return;
       try {
         const details = await deviceService.getDevice(id);
+        console.log(details)
         selectedDeviceDetails.value = details;
         isOnline.value = true;
       } catch {
