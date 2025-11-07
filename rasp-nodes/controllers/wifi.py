@@ -170,6 +170,15 @@ def connect_to_wifi(ssid, password):
             except subprocess.CalledProcessError as e:
                 error_msg = e.stderr.decode('utf-8') if e.stderr else str(e)
                 print(f"[WiFi] ERRO ao reconectar rede conhecida: {error_msg}")
+                # Se detectar erro 802.11, reinicia o NetworkManager
+                if '802.11' in error_msg or '802-11' in error_msg:
+                    print(f"[WiFi] Erro 802.11 detectado, reiniciando NetworkManager...")
+                    try:
+                        subprocess.check_output("sudo systemctl restart NetworkManager", shell=True, timeout=10)
+                        print(f"[WiFi] NetworkManager reiniciado com sucesso")
+                        time.sleep(2)  # Aguarda o NetworkManager reiniciar
+                    except Exception as restart_err:
+                        print(f"[WiFi] Erro ao reiniciar NetworkManager: {restart_err}")
                 # Se o erro indica que precisa de senha, continua para recriar
                 if "password" in error_msg.lower() or "secret" in error_msg.lower() or "not provided" in error_msg.lower():
                     print(f"[WiFi] Conexão conhecida precisa de senha, recriando...")
@@ -271,6 +280,15 @@ def connect_to_wifi(ssid, password):
             error_msg = e.stderr.decode('utf-8') if e.stderr else str(e)
             print(f"[WiFi] ✗ ERRO no Método 1: {error_msg}")
             print(f"[WiFi] Código de retorno: {e.returncode}")
+            # Se detectar erro 802.11, reinicia o NetworkManager
+            if '802.11' in error_msg or '802-11' in error_msg:
+                print(f"[WiFi] Erro 802.11 detectado, reiniciando NetworkManager...")
+                try:
+                    subprocess.check_output("sudo systemctl restart NetworkManager", shell=True, timeout=10)
+                    print(f"[WiFi] NetworkManager reiniciado com sucesso")
+                    time.sleep(2)  # Aguarda o NetworkManager reiniciar
+                except Exception as restart_err:
+                    print(f"[WiFi] Erro ao reiniciar NetworkManager: {restart_err}")
         except Exception as e:
             print(f"[WiFi] ✗ EXCEÇÃO no Método 1: {e}")
             import traceback
@@ -328,6 +346,15 @@ def connect_to_wifi(ssid, password):
             error_msg = e.stderr.decode('utf-8') if e.stderr else str(e)
             print(f"[WiFi] ✗ ERRO no Método 2: {error_msg}")
             print(f"[WiFi] Código: {e.returncode}")
+            # Se detectar erro 802.11, reinicia o NetworkManager
+            if '802.11' in error_msg or '802-11' in error_msg:
+                print(f"[WiFi] Erro 802.11 detectado, reiniciando NetworkManager...")
+                try:
+                    subprocess.check_output("sudo systemctl restart NetworkManager", shell=True, timeout=10)
+                    print(f"[WiFi] NetworkManager reiniciado com sucesso")
+                    time.sleep(2)  # Aguarda o NetworkManager reiniciar
+                except Exception as restart_err:
+                    print(f"[WiFi] Erro ao reiniciar NetworkManager: {restart_err}")
         except Exception as e:
             print(f"[WiFi] ✗ EXCEÇÃO no Método 2: {e}")
         
@@ -364,6 +391,7 @@ def get_network_info():
       - SSH: Status do serviço SSH (ativo/inativo).
       - USERS: Quantidade de usuários conectados via SSH.
       - SSID: Nome da rede Wi-Fi atual.
+      - FRONTEND_PORT: Porta do frontend (padrão 5173 para Vite).
 
     @return Dicionário com informações sobre o estado da rede.
     ----------------------------------------------------------------------
@@ -395,5 +423,38 @@ def get_network_info():
 
     # SSID atual
     info["SSID"] = get_connected_ssid()
+
+    # Porta do frontend (padrão 5173 para Vite)
+    # Tenta detectar se há processo Vite/node rodando e qual porta está usando
+    frontend_port = "5173"  # Porta padrão do Vite
+    try:
+        # Tenta múltiplas formas de detectar a porta do frontend
+        # Método 1: Verifica processos node/vite e suas portas
+        cmd = "ps aux | grep -E '(vite|node.*dev)' | grep -v grep | head -1"
+        ps_result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=2).decode("utf-8").strip()
+        if ps_result:
+            # Método 2: Usa ss ou netstat para encontrar portas em uso (5173, 3000, 8080, etc)
+            for port_candidate in ["5173", "3000", "8080", "5174", "5175"]:
+                try:
+                    # Tenta com ss primeiro (mais moderno)
+                    cmd = f"ss -tlnp 2>/dev/null | grep ':{port_candidate}' | head -1"
+                    result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                    if result:
+                        frontend_port = port_candidate
+                        break
+                except:
+                    try:
+                        # Fallback para netstat
+                        cmd = f"netstat -tlnp 2>/dev/null | grep ':{port_candidate}' | head -1"
+                        result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                        if result:
+                            frontend_port = port_candidate
+                            break
+                    except:
+                        continue
+    except:
+        pass  # Se não conseguir detectar, usa o padrão 5173
+    
+    info["FRONTEND_PORT"] = frontend_port
 
     return info

@@ -48,10 +48,14 @@ def display_message(line1="", line2="", line3="", line4="", line5="", clear=True
 
 def draw_network_info(info):
     """Exibe informações de rede."""
+    ip = info.get('IP', '')
+    frontend_port = info.get('FRONTEND_PORT', '5173')
+    # Mostra IP com porta do frontend se houver IP
+    ip_display = f"{ip}:{frontend_port}" if ip else ""
     display_message(
         f"SSID: {info.get('SSID', 'Desconhecido')[:19]}",
         f"Host: {info.get('HOST', '')}",
-        f"IP: {info.get('IP', '')}",
+        f"IP: {ip_display}",
         f"WiFi: {info.get('WIFI', '')[:18]}",
         f"SSH: {info.get('SSH', '')} Users:{info.get('USERS', '')}"
     )
