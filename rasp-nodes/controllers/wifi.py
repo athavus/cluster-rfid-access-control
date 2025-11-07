@@ -164,6 +164,9 @@ def connect_to_wifi(ssid, password):
                     print(f"[WiFi] Verificação {check+1}/10: SSID conectado = '{connected_ssid}'")
                     if connected_ssid == ssid:
                         print(f"[WiFi] ✓ Conexão estabelecida com sucesso (método: conexão conhecida)")
+                        # Limpa portas zumbis após mudança de rede
+                        time.sleep(1)
+                        cleanup_zombie_ports_on_network_change()
                         return True
                     time.sleep(1)
                 print(f"[WiFi] Falhou ao reconectar rede conhecida, continuando...")
@@ -264,6 +267,9 @@ def connect_to_wifi(ssid, password):
                     print(f"[WiFi] Tentativa {attempt+1}/30: SSID conectado = '{connected_ssid}'")
                 if connected_ssid == ssid:
                     print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 1) ✓✓✓")
+                    # Limpa portas zumbis após mudança de rede
+                    time.sleep(1)
+                    cleanup_zombie_ports_on_network_change()
                     return True
             
             # Verificação adicional
@@ -272,6 +278,9 @@ def connect_to_wifi(ssid, password):
             print(f"[WiFi] SSID final: '{final_ssid}'")
             if final_ssid == ssid:
                 print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 1, verificação adicional) ✓✓✓")
+                # Limpa portas zumbis após mudança de rede
+                time.sleep(1)
+                cleanup_zombie_ports_on_network_change()
                 return True
             
             print(f"[WiFi] ✗ Método 1 falhou: SSID esperado '{ssid}', atual '{final_ssid}'")
@@ -332,12 +341,18 @@ def connect_to_wifi(ssid, password):
                     print(f"[WiFi] Tentativa {attempt+1}/30: SSID = '{connected_ssid}'")
                 if connected_ssid == ssid:
                     print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 2) ✓✓✓")
+                    # Limpa portas zumbis após mudança de rede
+                    time.sleep(1)
+                    cleanup_zombie_ports_on_network_change()
                     return True
             
             time.sleep(5)
             final_ssid = get_connected_ssid()
             if final_ssid == ssid:
                 print(f"[WiFi] ✓✓✓ CONEXÃO ESTABELECIDA COM SUCESSO (método 2, verificação adicional) ✓✓✓")
+                # Limpa portas zumbis após mudança de rede
+                time.sleep(1)
+                cleanup_zombie_ports_on_network_change()
                 return True
             
             print(f"[WiFi] ✗ Método 2 falhou")
@@ -377,6 +392,282 @@ def connect_to_wifi(ssid, password):
         import traceback
         print(f"[WiFi] Traceback completo: {traceback.format_exc()}")
         return False
+
+
+def detect_frontend_port():
+    """
+    ----------------------------------------------------------------------
+    @brief Detecta a porta do frontend (npm/vite) ativo de forma inteligente.
+    
+    Varre processos node/vite ativos e identifica qual porta está realmente
+    sendo usada. Se encontrar múltiplas portas, prioriza a mais recente.
+    Também limpa portas zumbis de processos antigos.
+    
+    @return String com o número da porta (padrão "5173" se não encontrar)
+    ----------------------------------------------------------------------
+    """
+    import time
+    
+    frontend_port = "5173"  # Porta padrão do Vite
+    active_ports = []
+    
+    try:
+        # Método 1: Encontra processos node/vite ativos e seus PIDs
+        cmd = "ps aux | grep -E '(vite|node.*dev|npm.*dev)' | grep -v grep"
+        ps_result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=2).decode("utf-8").strip()
+        
+        if ps_result:
+            pids = []
+            for line in ps_result.split('\n'):
+                if line.strip():
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            pid = int(parts[1])
+                            pids.append(pid)
+                        except:
+                            pass
+            
+            # Método 2: Para cada PID, verifica qual porta está usando com lsof
+            for pid in pids:
+                try:
+                    # lsof mostra portas TCP abertas pelo processo
+                    cmd = f"lsof -Pan -p {pid} -iTCP -sTCP:LISTEN 2>/dev/null | grep LISTEN"
+                    lsof_result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                    if lsof_result:
+                        # Extrai a porta da saída do lsof (formato: node 1234 user 23u IPv4 ... TCP *:5173 (LISTEN))
+                        import re
+                        port_match = re.search(r':(\d+)\s+\(LISTEN\)', lsof_result)
+                        if port_match:
+                            port = port_match.group(1)
+                            # Verifica se é uma porta válida de frontend (5173, 3000, 8080, etc)
+                            if port.isdigit() and int(port) >= 3000 and int(port) <= 65535:
+                                # Pega o tempo de início do processo para priorizar o mais recente
+                                try:
+                                    cmd = f"ps -o lstart= -p {pid} 2>/dev/null"
+                                    start_time = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                                    active_ports.append((port, pid, start_time))
+                                except:
+                                    active_ports.append((port, pid, ""))
+                except:
+                    continue
+            
+            # Se não encontrou com lsof, tenta método alternativo: verifica todas as portas comuns
+            if not active_ports:
+                for port_candidate in ["5173", "5174", "5175", "3000", "8080", "5176", "5177"]:
+                    try:
+                        # Verifica se a porta está em LISTEN e qual PID está usando
+                        cmd = f"ss -tlnp 2>/dev/null | grep ':{port_candidate}' | grep LISTEN"
+                        result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                        if result:
+                            # Extrai PID da saída do ss
+                            import re
+                            pid_match = re.search(r'pid=(\d+)', result)
+                            if pid_match:
+                                pid = int(pid_match.group(1))
+                                # Verifica se é processo node/vite
+                                try:
+                                    cmd = f"ps -p {pid} -o comm= 2>/dev/null"
+                                    proc_name = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                                    if 'node' in proc_name.lower() or 'vite' in proc_name.lower():
+                                        active_ports.append((port_candidate, pid, ""))
+                                except:
+                                    pass
+                    except:
+                        continue
+            
+            # Se encontrou portas ativas, escolhe a mais recente ou a primeira
+            if active_ports:
+                # Ordena por tempo de início (mais recente primeiro) ou usa a primeira
+                if len(active_ports) > 1:
+                    # Se tem múltiplas portas, verifica se alguma é zumbi (processo antigo sem conexões)
+                    valid_ports = []
+                    for port, pid, start_time in active_ports:
+                        try:
+                            # Verifica se o processo ainda está respondendo (tem conexões ativas ou está em LISTEN recente)
+                            cmd = f"ss -tnp 2>/dev/null | grep ':{port}' | wc -l"
+                            conn_count = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                            # Se tem conexões ou está em LISTEN, é válido
+                            if conn_count.isdigit() and int(conn_count) >= 0:
+                                valid_ports.append((port, pid))
+                        except:
+                            valid_ports.append((port, pid))
+                    
+                    if valid_ports:
+                        # Prioriza porta 5173 se disponível, senão usa a primeira válida
+                        for port, pid in valid_ports:
+                            if port == "5173":
+                                frontend_port = port
+                                break
+                        else:
+                            frontend_port = valid_ports[0][0]
+                    else:
+                        frontend_port = active_ports[0][0]
+                else:
+                    frontend_port = active_ports[0][0]
+                
+                # Limpa portas zumbis (outras portas que não são a ativa)
+                if len(active_ports) > 1:
+                    cleanup_zombie_ports(frontend_port, [p[0] for p in active_ports])
+        
+        # Se não encontrou processos, verifica se há alguma porta em LISTEN que possa ser frontend
+        if frontend_port == "5173" and not active_ports:
+            for port_candidate in ["5173", "5174", "5175", "3000", "8080"]:
+                try:
+                    cmd = f"ss -tlnp 2>/dev/null | grep ':{port_candidate}' | grep LISTEN"
+                    result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                    if result:
+                        frontend_port = port_candidate
+                        break
+                except:
+                    continue
+                    
+    except Exception as e:
+        print(f"[WiFi] Aviso ao detectar porta do frontend: {e}")
+    
+    return frontend_port
+
+
+def cleanup_zombie_ports_on_network_change():
+    """
+    ----------------------------------------------------------------------
+    @brief Limpa portas zumbis quando há mudança de rede.
+    
+    Encontra processos node/vite ativos e identifica qual porta está realmente
+    sendo usada. Mata processos em outras portas que são zumbis de conexões antigas.
+    ----------------------------------------------------------------------
+    """
+    try:
+        import re
+        
+        # Encontra todos os processos node/vite ativos e suas portas
+        active_ports_pids = {}
+        
+        # Método 1: Encontra processos e suas portas via lsof
+        try:
+            cmd = "ps aux | grep -E '(vite|node.*dev|npm.*dev)' | grep -v grep"
+            ps_result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=2).decode("utf-8").strip()
+            
+            if ps_result:
+                pids = []
+                for line in ps_result.split('\n'):
+                    if line.strip():
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            try:
+                                pid = int(parts[1])
+                                pids.append(pid)
+                            except:
+                                pass
+                
+                # Para cada PID, encontra a porta
+                for pid in pids:
+                    try:
+                        cmd = f"lsof -Pan -p {pid} -iTCP -sTCP:LISTEN 2>/dev/null | grep LISTEN"
+                        lsof_result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                        if lsof_result:
+                            port_match = re.search(r':(\d+)\s+\(LISTEN\)', lsof_result)
+                            if port_match:
+                                port = port_match.group(1)
+                                if port.isdigit() and int(port) >= 3000 and int(port) <= 65535:
+                                    active_ports_pids[port] = pid
+                    except:
+                        continue
+        except:
+            pass
+        
+        # Método 2: Se não encontrou com lsof, usa ss para encontrar portas node/vite
+        if not active_ports_pids:
+            for port_candidate in ["5173", "5174", "5175", "5176", "5177", "3000", "8080"]:
+                try:
+                    cmd = f"ss -tlnp 2>/dev/null | grep ':{port_candidate}' | grep LISTEN"
+                    result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                    if result:
+                        pid_match = re.search(r'pid=(\d+)', result)
+                        if pid_match:
+                            pid = int(pid_match.group(1))
+                            try:
+                                cmd = f"ps -p {pid} -o comm= 2>/dev/null"
+                                proc_name = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                                if 'node' in proc_name.lower() or 'vite' in proc_name.lower():
+                                    active_ports_pids[port_candidate] = pid
+                            except:
+                                pass
+                except:
+                    continue
+        
+        # Se encontrou múltiplas portas, identifica qual é a ativa (mais recente ou com conexões)
+        if len(active_ports_pids) > 1:
+            # Verifica qual porta tem conexões ativas (não apenas LISTEN)
+            active_port = None
+            for port, pid in active_ports_pids.items():
+                try:
+                    cmd = f"ss -tnp 2>/dev/null | grep ':{port}' | grep -v LISTEN | wc -l"
+                    conn_count = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                    if conn_count.isdigit() and int(conn_count) > 0:
+                        active_port = port
+                        break
+                except:
+                    pass
+            
+            # Se não encontrou porta com conexões, usa a primeira (ou 5173 se disponível)
+            if not active_port:
+                if "5173" in active_ports_pids:
+                    active_port = "5173"
+                else:
+                    active_port = list(active_ports_pids.keys())[0]
+            
+            # Mata processos nas outras portas (zumbis)
+            for port, pid in active_ports_pids.items():
+                if port != active_port:
+                    try:
+                        print(f"[WiFi] Limpando porta zumbi {port} (PID {pid}) após mudança de rede")
+                        subprocess.run(f"kill -9 {pid} 2>/dev/null", shell=True, timeout=2)
+                    except:
+                        pass
+        elif len(active_ports_pids) == 1:
+            # Apenas uma porta, não precisa limpar nada
+            pass
+        
+    except Exception as e:
+        print(f"[WiFi] Aviso ao limpar portas zumbis após mudança de rede: {e}")
+
+
+def cleanup_zombie_ports(active_port, all_ports):
+    """
+    ----------------------------------------------------------------------
+    @brief Limpa portas zumbis (processos antigos que não são mais o frontend ativo).
+    
+    @param active_port: Porta do frontend ativo
+    @param all_ports: Lista de todas as portas encontradas
+    ----------------------------------------------------------------------
+    """
+    try:
+        for port in all_ports:
+            if port != active_port:
+                try:
+                    # Encontra PID usando a porta zumbi
+                    cmd = f"ss -tlnp 2>/dev/null | grep ':{port}' | grep LISTEN"
+                    result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                    if result:
+                        import re
+                        pid_match = re.search(r'pid=(\d+)', result)
+                        if pid_match:
+                            pid = int(pid_match.group(1))
+                            # Verifica se é processo node/vite
+                            try:
+                                cmd = f"ps -p {pid} -o comm= 2>/dev/null"
+                                proc_name = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
+                                if 'node' in proc_name.lower() or 'vite' in proc_name.lower():
+                                    # Mata o processo zumbi
+                                    print(f"[WiFi] Limpando porta zumbi {port} (PID {pid})")
+                                    subprocess.run(f"kill -9 {pid} 2>/dev/null", shell=True, timeout=2)
+                            except:
+                                pass
+                except:
+                    pass
+    except Exception as e:
+        print(f"[WiFi] Aviso ao limpar portas zumbis: {e}")
 
 
 def get_network_info():
@@ -424,37 +715,8 @@ def get_network_info():
     # SSID atual
     info["SSID"] = get_connected_ssid()
 
-    # Porta do frontend (padrão 5173 para Vite)
-    # Tenta detectar se há processo Vite/node rodando e qual porta está usando
-    frontend_port = "5173"  # Porta padrão do Vite
-    try:
-        # Tenta múltiplas formas de detectar a porta do frontend
-        # Método 1: Verifica processos node/vite e suas portas
-        cmd = "ps aux | grep -E '(vite|node.*dev)' | grep -v grep | head -1"
-        ps_result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=2).decode("utf-8").strip()
-        if ps_result:
-            # Método 2: Usa ss ou netstat para encontrar portas em uso (5173, 3000, 8080, etc)
-            for port_candidate in ["5173", "3000", "8080", "5174", "5175"]:
-                try:
-                    # Tenta com ss primeiro (mais moderno)
-                    cmd = f"ss -tlnp 2>/dev/null | grep ':{port_candidate}' | head -1"
-                    result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
-                    if result:
-                        frontend_port = port_candidate
-                        break
-                except:
-                    try:
-                        # Fallback para netstat
-                        cmd = f"netstat -tlnp 2>/dev/null | grep ':{port_candidate}' | head -1"
-                        result = subprocess.check_output(cmd, shell=True, stderr=subprocess.PIPE, timeout=1).decode("utf-8").strip()
-                        if result:
-                            frontend_port = port_candidate
-                            break
-                    except:
-                        continue
-    except:
-        pass  # Se não conseguir detectar, usa o padrão 5173
-    
+    # Porta do frontend - detecção inteligente
+    frontend_port = detect_frontend_port()
     info["FRONTEND_PORT"] = frontend_port
 
     return info
