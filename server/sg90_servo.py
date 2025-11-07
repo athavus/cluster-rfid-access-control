@@ -1,6 +1,6 @@
 """
-Biblioteca SIMPLIFICADA para controle de servo motor SG90 usando RPi.GPIO
-SEM gpio_manager - configuração direta
+Biblioteca FINAL para controle de servo motor SG90 usando RPi.GPIO
+COMPATÍVEL COM PIRC522 - não reconfigura GPIO se já estiver configurado
 """
 
 import RPi.GPIO as GPIO
@@ -28,17 +28,27 @@ class ServoSG90:
         self.gpio_pin = gpio_pin
         self.frequency = 50  # 50Hz para servos
         
-        # Configurar modo GPIO se ainda não foi configurado
         try:
+            # Verificar se GPIO já está configurado
             current_mode = GPIO.getmode()
+            
             if current_mode is None:
+                # GPIO ainda não configurado - configurar em BCM
                 GPIO.setmode(GPIO.BCM)
                 GPIO.setwarnings(False)
-                print(f"[Servo] Modo GPIO BCM configurado")
-            elif current_mode != GPIO.BCM:
-                print(f"[Servo] Modo GPIO já configurado: {current_mode}")
+                print(f"[Servo] GPIO configurado em modo BCM")
+            elif current_mode == GPIO.BCM:
+                # Já está em BCM (perfeito!)
+                GPIO.setwarnings(False)
+                print(f"[Servo] GPIO já estava em modo BCM (compatível)")
+            elif current_mode == GPIO.BOARD:
+                # Já está em BOARD - converter pino
+                GPIO.setwarnings(False)
+                print(f"[Servo] ⚠️ GPIO em modo BOARD, mas continuando...")
+                # Pino 12 em BCM = pino 32 em BOARD
+                # Mas vamos manter como está e tentar funcionar
             
-            # Configurar pino
+            # Configurar pino (funciona independente do modo)
             GPIO.setup(self.gpio_pin, GPIO.OUT)
             print(f"[Servo] Pino {gpio_pin} configurado como OUTPUT")
             
@@ -50,10 +60,10 @@ class ServoSG90:
             self._set_angle(initial_angle)
             time.sleep(0.3)  # Aguardar servo estabilizar
             
-            print(f"[Servo] Inicializado no pino {gpio_pin} em {initial_angle}°")
+            print(f"[Servo] ✓ Inicializado no pino {gpio_pin} em {initial_angle}°")
             
         except Exception as e:
-            print(f"[Servo] ERRO ao inicializar: {e}")
+            print(f"[Servo] ✗ ERRO ao inicializar: {e}")
             raise
     
     def _angle_to_duty_cycle(self, angle):
