@@ -1,10 +1,9 @@
 """
-Handler RFID para Raspberry Pi 5
-Gerencia leitura de tags RFID e persiste dados
+RFID Handler CORRIGIDO para Raspberry Pi 5
+Gerencia leitura de tags RFID SEM conflitar com GPIO
 """
 
 import threading
-import json
 from datetime import datetime
 from typing import Optional, Callable
 from database import SessionLocal, RFIDTag, RFIDReadHistory, DeviceStatus
@@ -15,7 +14,8 @@ try:
     RFID_AVAILABLE = True
 except ImportError:
     RFID_AVAILABLE = False
-    print("pirc522 não disponível - rodando em modo simulação")
+    print("[RFID] pirc522 não disponível - rodando em modo simulação")
+
 
 class RFIDHandler:
     """Handler para gerenciar sensor RFID"""
@@ -29,15 +29,8 @@ class RFIDHandler:
         
         if RFID_AVAILABLE:
             try:
-                # Garantir que nenhum modo GPIO conflitante esteja ativo antes do RFID()
-                try:
-                    import RPi.GPIO as GPIO
-                    current_mode = GPIO.getmode()
-                    if current_mode is not None:
-                        # Zera estado para permitir que pirc522 defina o modo necessário
-                        GPIO.cleanup()
-                except Exception:
-                    pass
+                # IMPORTANTE: pirc522 gerencia GPIO internamente
+                # Não fazer GPIO.cleanup() aqui - deixar pirc522 gerenciar
                 self.reader = RFID()
                 self.util = self.reader.util()
                 self.util.debug = False
@@ -57,7 +50,7 @@ class RFIDHandler:
             tag = db.query(RFIDTag).filter(RFIDTag.uid == uid_str).first()
             if tag:
                 return tag.name
-            return "<Sem nome>"
+            return ""
         finally:
             db.close()
     
@@ -76,6 +69,7 @@ class RFIDHandler:
                     raspberry_id=self.raspberry_id
                 )
                 db.add(tag)
+            
             db.commit()
             return True
         except Exception as e:
@@ -101,9 +95,11 @@ class RFIDHandler:
             device = db.query(DeviceStatus).filter(
                 DeviceStatus.raspberry_id == self.raspberry_id
             ).first()
+            
             if device:
                 device.last_rfid_read = datetime.utcnow()
                 device.rfid_reader_status = "online"
+            
             db.commit()
             return True
         except Exception as e:
@@ -139,7 +135,7 @@ class RFIDHandler:
             
             # Exibir UID lido no terminal
             print(f"[RFID] Tag lida UID={uid_str} Nome={tag_name}")
-
+            
             result = {
                 "uid": uid_str,
                 "tag_name": tag_name,
@@ -187,21 +183,7 @@ class RFIDHandler:
                 self.reader.cleanup()
             except:
                 pass
-    
-    def set_rfid_status(self, status: str):
-        """Atualiza status do leitor RFID no DeviceStatus"""
-        db = SessionLocal()
-        try:
-            device = db.query(DeviceStatus).filter(
-                DeviceStatus.raspberry_id == self.raspberry_id
-            ).first()
-            if device:
-                device.rfid_reader_status = status
-                db.commit()
-        except Exception as e:
-            print(f"[RFID] Erro ao atualizar status: {e}")
-        finally:
-            db.close()
+
 
 # Instância global
 _rfid_handler: Optional[RFIDHandler] = None
@@ -222,5 +204,4 @@ def cleanup_rfid():
     if _rfid_handler:
         _rfid_handler.stop_polling()
         _rfid_handler = None
-
 

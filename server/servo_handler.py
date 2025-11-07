@@ -1,6 +1,7 @@
 """
 Handler para controle do servo motor SG90 (fechadura)
 Controla o servo no pino 12 para simular abertura de porta
+VERSÃO CORRIGIDA - usa sg90_servo.py existente
 """
 
 import threading
@@ -8,12 +9,15 @@ from typing import Optional
 from datetime import datetime
 from database import SessionLocal
 
+# Tentar importar biblioteca do servo
 try:
     from sg90_servo import ServoSG90
     SERVO_AVAILABLE = True
-except ImportError:
+    print("[Servo] Biblioteca sg90_servo importada com sucesso")
+except ImportError as e:
     SERVO_AVAILABLE = False
-    print("[Servo] sg90_servo não disponível - rodando em modo simulação")
+    print(f"[Servo] sg90_servo não disponível - rodando em modo simulação: {e}")
+
 
 class ServoHandler:
     """Handler para gerenciar servo motor (fechadura)"""
@@ -33,14 +37,20 @@ class ServoHandler:
         
         if SERVO_AVAILABLE:
             try:
+                print(f"[Servo] Tentando inicializar servo no pino GPIO {gpio_pin}...")
                 # Inicializa o servo na posição fechada (90 graus)
                 self.servo = ServoSG90(gpio_pin, initial_angle=90)
-                print(f"[Servo] Servo inicializado no pino {gpio_pin} (posição fechada)")
+                print(f"[Servo] ✓ Servo inicializado com sucesso no pino {gpio_pin}")
+            except PermissionError as e:
+                print(f"[Servo] ✗ ERRO DE PERMISSÃO: {e}")
+                print("[Servo] Execute com: sudo uvicorn main:app --host 0.0.0.0 --port 8000")
+                self.servo = None
             except Exception as e:
-                print(f"[Servo] Erro ao inicializar servo: {e}")
+                print(f"[Servo] ✗ Erro ao inicializar servo: {e}")
+                print(f"[Servo] Tipo do erro: {type(e).__name__}")
                 self.servo = None
         else:
-            print("[Servo] Servo não disponível (modo simulação)")
+            print("[Servo] Servo não disponível (biblioteca não encontrada)")
     
     def open_door(self, hold_time: float = 5.0) -> bool:
         """
@@ -57,25 +67,30 @@ class ServoHandler:
             return False
         
         if not self.servo:
-            print("[Servo] Servo não disponível (modo simulação)")
-            # Em modo simulação, apenas registra
+            print("[Servo] ⚠️ Modo simulação - abrindo porta (virtual)")
             self.is_open = True
             self.last_open_time = datetime.utcnow()
+            # Simular tempo de abertura
+            import time
+            time.sleep(hold_time)
+            self.is_open = False
             return True
         
         self.is_moving = True
         
         def open_thread():
             try:
-                # Abre a porta (180 graus)
-                print(f"[Servo] Abrindo porta (movendo para 180°)...")
+                print(f"[Servo] → Abrindo porta (movendo para 180°)...")
                 self.is_open = True
                 self.last_open_time = datetime.utcnow()
+                
+                # Usar método move_to_angle_and_return do servo
                 self.servo.move_to_angle_and_return(180, hold_time=hold_time)
+                
                 self.is_open = False
-                print(f"[Servo] Porta fechada novamente (retornou para 90°)")
+                print(f"[Servo] ← Porta fechada novamente (retornou para 90°)")
             except Exception as e:
-                print(f"[Servo] Erro ao abrir porta: {e}")
+                print(f"[Servo] ✗ Erro ao abrir porta: {e}")
                 self.is_open = False
             finally:
                 self.is_moving = False
@@ -110,12 +125,14 @@ class ServoHandler:
             except Exception as e:
                 print(f"[Servo] Erro ao limpar recursos: {e}")
 
+
 # Instância global
 _servo_handler: Optional[ServoHandler] = None
 
 def init_servo_handler(gpio_pin: int = 12) -> ServoHandler:
     """Inicializa o handler global do servo"""
     global _servo_handler
+    print(f"[Servo Handler] Inicializando no pino GPIO {gpio_pin}...")
     _servo_handler = ServoHandler(gpio_pin)
     return _servo_handler
 
@@ -129,4 +146,3 @@ def cleanup_servo():
     if _servo_handler:
         _servo_handler.cleanup()
         _servo_handler = None
-
