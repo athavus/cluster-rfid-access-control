@@ -2,7 +2,6 @@
 """
 Handler para controle do servo motor SG90 (fechadura)
 Controla o servo no pino 12 para simular abertura de porta
-VERSÃO CORRIGIDA - usa sg90_servo.py existente
 """
 
 import threading
@@ -53,7 +52,7 @@ class ServoHandler:
         else:
             print("[Servo] Servo não disponível (biblioteca não encontrada)")
     
-    def open_door(self, hold_time: float = 5.0) -> bool:
+    def open_door(self, hold_time: float = 10.0) -> bool:
         """
         Abre a fechadura (gira o servo para 180°) e mantém por hold_time segundos
         
