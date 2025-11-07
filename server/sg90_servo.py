@@ -1,9 +1,9 @@
 """
-Biblioteca para controle de servo motor SG90 usando lgpio
+Biblioteca para controle de servo motor SG90 usando RPi.GPIO
 Compatível com Raspberry Pi
 """
 
-import lgpio
+import RPi.GPIO as GPIO
 import time
 
 class ServoSG90:
@@ -27,34 +27,39 @@ class ServoSG90:
         """
         self.gpio_pin = gpio_pin
         self.frequency = 50  # 50Hz para servos
-        self.chip = lgpio.gpiochip_open(0)
         
-        # Configurar o pino como saída
-        lgpio.gpio_claim_output(self.chip, self.gpio_pin)
+        # Configurar GPIO
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
+        GPIO.setup(self.gpio_pin, GPIO.OUT)
+        
+        # Inicializar PWM
+        self.pwm = GPIO.PWM(self.gpio_pin, self.frequency)
         
         # Mover para posição inicial
         self.current_angle = initial_angle
         self._set_angle(initial_angle)
         time.sleep(0.3)  # Aguardar servo estabilizar
     
-    def _angle_to_pulse_width(self, angle):
+    def _angle_to_duty_cycle(self, angle):
         """
-        Converte ângulo (0-180) para largura de pulso em microssegundos
+        Converte ângulo (0-180) para duty cycle (2-12%)
         
         Args:
             angle (int): Ângulo desejado (0-180)
             
         Returns:
-            int: Largura do pulso em microssegundos
+            float: Duty cycle em porcentagem
         """
         # Limitar ângulo entre 0 e 180
         angle = max(0, min(180, angle))
         
-        # Mapear ângulo para largura de pulso
-        # 0° = 1000µs (1ms), 180° = 2000µs (2ms)
-        pulse_width = int(1000 + (angle / 180.0) * 1000)
+        # Mapear ângulo para duty cycle
+        # 0° = 2% (1ms), 90° = 7% (1.5ms), 180° = 12% (2ms)
+        # Fórmula: duty_cycle = 2 + (angle / 180) * 10
+        duty_cycle = 2 + (angle / 180.0) * 10
         
-        return pulse_width
+        return duty_cycle
     
     def _set_angle(self, angle):
         """
@@ -63,13 +68,12 @@ class ServoSG90:
         Args:
             angle (int): Ângulo desejado (0-180)
         """
-        pulse_width = self._angle_to_pulse_width(angle)
+        duty_cycle = self._angle_to_duty_cycle(angle)
         
-        # Enviar apenas pulsos suficientes para movimento rápido
-        # Reduzido para evitar tremor
-        for _ in range(20):  # ~20 pulsos (0.4 segundos)
-            lgpio.tx_pulse(self.chip, self.gpio_pin, pulse_width, 20000 - pulse_width)
-            time.sleep(0.02)  # 20ms = 50Hz
+        # Iniciar PWM e enviar pulsos
+        self.pwm.start(duty_cycle)
+        time.sleep(0.4)  # Tempo para movimento
+        self.pwm.ChangeDutyCycle(0)  # Parar sinais para evitar tremor
     
     def move_continuous(self, angle1, angle2, wait_time=1, cycles=None):
         """
@@ -133,7 +137,8 @@ class ServoSG90:
         """
         Libera os recursos do GPIO
         """
-        lgpio.gpiochip_close(self.chip)
+        self.pwm.stop()
+        GPIO.cleanup(self.gpio_pin)
         print("GPIO liberado")
 
 
@@ -172,4 +177,18 @@ def rotate_servo(gpio_pin, angle, hold_time=5, return_to=90):
         servo.move_to_angle_and_return(angle, hold_time)
     finally:
         servo.cleanup()
+
+
+# Exemplo de uso
+if __name__ == "__main__":
+    # Usar o pino GPIO 18 (BCM)
+    SERVO_PIN = 18
+    
+    # Exemplo 1: Movimento simples
+    print("=== Exemplo 1: Mover para 180° e voltar ===")
+    rotate_servo(SERVO_PIN, angle=180, hold_time=5, return_to=90)
+    
+    # Exemplo 2: Movimento contínuo
+    # print("\n=== Exemplo 2: Movimento contínuo ===")
+    # rotate_servo_continuous(SERVO_PIN, angle_from=0, angle_to=180, wait_time=1, cycles=5)
 
