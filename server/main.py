@@ -55,14 +55,15 @@ def on_rfid_read(rfid_data: dict):
                 )
                 db.add(door_open)
                 
-                # Atualizar status do dispositivo
+                # Atualizar apenas last_door_open, mas manter servo_status como "closed"
+                # O status será controlado pelo frontend baseado no popup do RFID
                 device = db.query(DeviceStatus).filter(
                     DeviceStatus.raspberry_id == rfid_data.get('raspberry_id', '1')
                 ).first()
                 if device:
-                    device.servo_status = "open"
                     device.last_door_open = datetime.utcnow()
                     device.last_update = datetime.utcnow()
+                    # Não atualiza servo_status aqui - sempre fica "closed" no banco
                 
                 db.commit()
             except Exception as e:
@@ -304,10 +305,10 @@ def receive_rfid_read(read_event: RFIDReadEvent, db: Session = Depends(get_db)):
                 )
                 db.add(door_open)
                 
-                # Atualizar status do dispositivo
+                # Atualizar apenas last_door_open, mas manter servo_status como "closed"
                 if device:
-                    device.servo_status = "open"
                     device.last_door_open = datetime.utcnow()
+                    # Não atualiza servo_status aqui - sempre fica "closed" no banco
                 
                 db.commit()
             except Exception as e:

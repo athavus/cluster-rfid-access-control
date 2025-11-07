@@ -38,8 +38,8 @@
     </div>
     <div>
       <h4 class="font-semibold mb-1">Status Fechadura</h4>
-      <p :class="getServoStatusClass(deviceDetails.servo_status)">
-        {{ formatServoStatus(deviceDetails.servo_status) }}
+      <p :class="getServoStatusClass(displayServoStatus)">
+        {{ formatServoStatus(displayServoStatus) }}
       </p>
     </div>
     <div v-if="deviceDetails.last_door_open">
@@ -56,6 +56,48 @@ export default {
     deviceDetails: {
       type: Object,
       required: true
+    },
+    showRfidBanner: {
+      type: Boolean,
+      default: false
+    }
+  },
+  data() {
+    return {
+      servoOpenTimer: null,
+      isServoOpen: false
+    };
+  },
+  watch: {
+    showRfidBanner(newVal) {
+      if (newVal) {
+        // Quando o popup aparecer, mostra "aberta" por 1 segundo
+        this.isServoOpen = true;
+        if (this.servoOpenTimer) {
+          clearTimeout(this.servoOpenTimer);
+        }
+        this.servoOpenTimer = setTimeout(() => {
+          this.isServoOpen = false;
+        }, 1000); // 1 segundo
+      } else {
+        // Se o popup fechar, garante que está fechada
+        this.isServoOpen = false;
+        if (this.servoOpenTimer) {
+          clearTimeout(this.servoOpenTimer);
+          this.servoOpenTimer = null;
+        }
+      }
+    }
+  },
+  computed: {
+    displayServoStatus() {
+      // Sempre mostra "closed" exceto quando isServoOpen for true (1 segundo após popup aparecer)
+      return this.isServoOpen ? 'open' : 'closed';
+    }
+  },
+  beforeUnmount() {
+    if (this.servoOpenTimer) {
+      clearTimeout(this.servoOpenTimer);
     }
   },
   methods: {

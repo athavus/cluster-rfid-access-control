@@ -16,7 +16,10 @@
       @toggle-led="$emit('toggle-led', $event)"
     />
 
-    <DeviceStatusGrid :device-details="deviceDetails" />
+    <DeviceStatusGrid 
+      :device-details="deviceDetails" 
+      :show-rfid-banner="showRfidBanner"
+    />
   </section>
 </template>
 
@@ -48,6 +51,10 @@ export default {
       default: ''
     },
     loading: {
+      type: Boolean,
+      default: false
+    },
+    showRfidBanner: {
       type: Boolean,
       default: false
     }

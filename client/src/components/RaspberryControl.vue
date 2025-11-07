@@ -19,6 +19,7 @@
         :external-led-pin="externalLedPin"
         :target-host="targetHost"
         :loading="loading"
+        :show-rfid-banner="showRfidBanner"
         @update:externalLedPin="externalLedPin = $event"
         @update:targetHost="targetHost = $event"
         @toggle-led="toggleLED"
