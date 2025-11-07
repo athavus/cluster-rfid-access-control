@@ -92,25 +92,69 @@ class GPIOController:
             True se bem-sucedido, False caso contrário
         """
         if GPIO_AVAILABLE:
-            _initialize_gpio_if_needed()
-            current_mode = GPIO.getmode()
-            effective_pin = pin
-            if current_mode == GPIO.BOARD:
-                # Converte do BCM informado pelo cliente para BOARD
-                if pin not in GPIOController._BCM_TO_BOARD:
-                    raise ValueError(f"BCM {pin} não mapeado para BOARD")
-                effective_pin = GPIOController._BCM_TO_BOARD[pin]
-            # Garante que o pino informado esteja configurado como saída
             try:
-                GPIO.setup(effective_pin, GPIO.OUT)
-            except Exception:
-                # Algumas implementações levantam se já configurado; ignorar
-                pass
-            if state:
-                GPIO.output(effective_pin, GPIO.HIGH)
-            else:
-                GPIO.output(effective_pin, GPIO.LOW)
-            return True
+                _initialize_gpio_if_needed()
+                current_mode = GPIO.getmode()
+                
+                if current_mode is None:
+                    # Se não há modo definido, define como BCM
+                    GPIO.setmode(GPIO.BCM)
+                    current_mode = GPIO.BCM
+                
+                effective_pin = pin
+                if current_mode == GPIO.BOARD:
+                    # Converte do BCM informado pelo cliente para BOARD
+                    if pin not in GPIOController._BCM_TO_BOARD:
+                        raise ValueError(f"BCM {pin} não mapeado para BOARD")
+                    effective_pin = GPIOController._BCM_TO_BOARD[pin]
+                
+                # Verifica se o pino não está em uso pelo servo (pino 12)
+                if effective_pin == 12:
+                    raise RuntimeError(f"Pino {pin} (BCM 12) está reservado para o servo motor. Use outro pino para o LED.")
+                
+                # Garante que o pino informado esteja configurado como saída
+                # Tenta configurar o pino, ignorando erros se já estiver configurado
+                try:
+                    GPIO.setup(effective_pin, GPIO.OUT, initial=GPIO.LOW)
+                except RuntimeError as e:
+                    error_msg = str(e).lower()
+                    # Se o erro for sobre pino já configurado ou modo, tenta continuar
+                    if "already" in error_msg or "mode" in error_msg:
+                        # Pino já configurado, pode tentar usar mesmo assim
+                        pass
+                    elif "not allocated" in error_msg:
+                        # Erro específico do lgpio - pode ser conflito com servo
+                        raise RuntimeError(f"Pino {pin} (BCM) não está disponível. Pode estar em uso pelo servo motor (pino 12) ou outro processo.")
+                    else:
+                        raise
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    if "not allocated" in error_msg:
+                        raise RuntimeError(f"Pino {pin} (BCM) não está disponível. Pode estar em uso por outro processo.")
+                    elif "already" in error_msg or "mode" in error_msg:
+                        # Pino já configurado, pode continuar
+                        pass
+                    else:
+                        raise
+                
+                # Tenta controlar o LED
+                try:
+                    if state:
+                        GPIO.output(effective_pin, GPIO.HIGH)
+                    else:
+                        GPIO.output(effective_pin, GPIO.LOW)
+                except RuntimeError as e:
+                    # Se falhar ao controlar, pode ser que o pino esteja em uso
+                    error_msg = str(e).lower()
+                    if "not allocated" in error_msg:
+                        raise RuntimeError(f"Pino {pin} (BCM) não está disponível. Pode estar em uso por outro processo (ex: servo no pino 12).")
+                    raise
+                
+                return True
+            except Exception as e:
+                error_msg = str(e)
+                print(f"[GPIO] Erro ao controlar LED no pino {pin}: {error_msg}")
+                raise RuntimeError(f"Falha no GPIO: {error_msg}")
         else:
             # Modo simulação
             if state:
