@@ -1,7 +1,7 @@
 <template>
   <header class="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
     <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-      <h1 class="text-xl font-semibold text-gray-900">Raspberry Pi IoT Dashboard</h1>
+      <h1 class="text-xl font-semibold text-gray-900">Raspberry Gate & HealthChecker</h1>
       <div class="flex items-center gap-4">
         <button 
           @click="$emit('refresh')" 

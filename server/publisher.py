@@ -72,7 +72,7 @@ def publish_health_data():
     try:
         credentials = pika.PlainCredentials('athavus', '1234')
         connection = pika.BlockingConnection(
-            pika.ConnectionParameters('192.168.15.15', 5672, '/', credentials, heartbeat=600)
+            pika.ConnectionParameters('192.168.130.9', 5672, '/', credentials, heartbeat=600)
         )
         channel = connection.channel()
         channel.queue_declare(queue='rasp_data', durable=True)
