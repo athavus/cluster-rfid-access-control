@@ -4,6 +4,8 @@
 
 # Mini‑cluster de Controle de Acesso por RFID com Raspberries
 
+![Montagem da Aplicação](./docs/assets/montagem.jpg)
+
 Mensageria com RabbitMQ + Python (pika/psutil) + SQLAlchemy/SQLite + Frontend (VueJs)
 
 Este projeto implementa a base de um mini‑cluster para controle de acesso a portas utilizando múltiplas Raspberry Pis. Cada Raspberry coleta métricas (health check) e, futuramente, eventos de leitura RFID, enviando-os ao broker RabbitMQ. Um serviço central (consumer) processa as mensagens, atualiza o estado dos dispositivos e persiste dados no banco. Um frontend (a ser adicionado) exibirá dashboards e permitirá gestão de tags e eventos.
