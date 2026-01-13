@@ -1,130 +1,56 @@
-# Guia de Instalação e Execução do Projeto
+# Rasp-Nodes (Edge Code)
 
-Este guia descreve como configurar, instalar e executar corretamente o projeto em seu ambiente local.
+Este diretório contém o código que deve ser executado nas placas **Raspberry Pi** (os "nós" do cluster). Ele é responsável por interagir com o hardware local e comunicar com o servidor central.
 
----
+## Funcionalidades
 
-## 1. Criar e Ativar o Ambiente Virtual
+*   **Monitoramento (Health Check)**: Coleta e envia dados de CPU, RAM, Disco, Rede e Temperatura a cada segundo.
+*   **Interface Local**:
+    *   Display OLED (SSD1306): Mostra IP, Status e Mensagens.
+    *   Botões Físicos: Navegação em menus locais (ex.: Seleção de WiFi).
+*   **Controle de Acesso**:
+    *   Leitor RFID (MFRC522): Leitura de tags e envio para validação.
+    *   Atuadores: Controle de Servo/Relé para abrir portas.
 
-É **necessário criar e ativar uma virtual environment (venv)** antes de utilizar o projeto.
+## Hardware Suportado
 
+*   Raspberry Pi 3/4/Zero W
+*   Display OLED I2C 128x64 (Driver SSD1306)
+*   Leitor RFID RC522 (SPI)
+*   Botões (GPIO)
+*   Servo Motor (PWM/GPIO)
+
+## Instalação na Raspberry Pi
+
+### 1. Preparar Sistema
+Instale as dependências do sistema operacional:
 ```bash
-python -m venv venv
+sudo apt update
+sudo apt install python3-venv python3-dev swig liblgpio-dev i2c-tools
 ```
+*Habilite as interfaces I2C e SPI via `sudo raspi-config`.*
 
-### Ativar o ambiente virtual
-
-- **Bash:**
-  ```bash
-  source venv/bin/activate
-  ```
-
-- **Fish:**
-  ```bash
-  source venv/bin/activate.fish
-  ```
-
----
-
-## 2. Instalar Dependências do Sistema
-
-Após ativar o ambiente virtual, instale as dependências necessárias.
-
-### Dependências do sistema operacional
-
+### 2. Configurar Ambiente Python
 ```bash
-sudo apt install swig liblgpio-dev
-```
-
-### Dependências do Python
-
-```bash
+# Na pasta rasp-nodes/
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Após isso, todas as dependências estarão instaladas corretamente.
+### 3. Configuração
+Verifique os arquivos de configuração em `controllers/` e `system/`:
+*   **Teclado/Input**: Se usar botões emulados ou dispositivos específicos, ajuste em `controllers/keyboard.py`.
+*   **RabbitMQ**: Configure o host do RabbitMQ se não estiver rodando localmente (edite `publisher.py` ou use variáveis de ambiente se suportado).
 
----
-
-## 3. Configuração do Teclado
-
-Para configurar o teclado utilizado pelo sistema:
-
-1. Liste os dispositivos de entrada disponíveis:
-   ```bash
-   ls /dev/input/
-   ```
-
-2. Identifique o **event** correspondente ao seu teclado.
-
-3. No arquivo `controllers/keyboard.py`, **na linha 4**, substitua o caminho atual pelo **event** identificado.
-
----
-
-## 4. Executar o Sistema
-
-Após realizar a configuração, execute o sistema com o comando:
-
+### 4. Executar
 ```bash
-python main.py
+sudo env PATH=$PATH python main.py
 ```
+*(O uso de `sudo` pode ser necessário para acesso direto ao hardware GPIO/SPI em algumas distros).*
 
----
+## Estrutura
 
-## 5. Possíveis Conflitos de Dependências
-
-Em alguns sistemas podem ocorrer conflitos entre versões de bibliotecas.
-É importante consultar a documentação das principais dependências utilizadas.
-
-### Adafruit Circuit Python SSD1306
-
-[https://github.com/adafruit/Adafruit_CircuitPython_SSD1306](https://github.com/adafruit/Adafruit_CircuitPython_SSD1306)
-
----
-
-### Erro Comum: `NameError: name 'DigitalInOut' is not defined`
-
-Esse erro pode ocorrer no arquivo:
-
-```
-venv/lib/python3.13/site-packages/adafruit_bus_device/spi_device.py
-```
-
-#### Trecho original problemático
-
-```python
-import time
-
-try:
-    from types import TracebackType
-    from typing import Optional, Type
-
-    # Used only for type annotations.
-    from busio import SPI
-    from digitalio import DigitalInOut
-except ImportError:
-    pass
-```
-
-#### Solução
-
-Reorganize os imports da seguinte forma:
-
-```python
-import time
-from digitalio import DigitalInOut
-
-try:
-    from types import TracebackType
-    from typing import Optional, Type
-
-    # Used only for type annotations.
-    from busio import SPI
-except ImportError:
-    pass
-```
-
-Após essa correção, o erro deve desaparecer.  
-Se não houver novas mensagens de erro, o projeto está pronto para execução.
-
----
+*   `main.py`: Ponto de entrada. Inicializa o loop principal.
+*   `system/`: Lógica de estados da aplicação (modos Conectado, Desconectado, Seleção de WiFi).
+*   `controllers/`: Drivers de hardware (Display, Botões, WiFi, GPIO).

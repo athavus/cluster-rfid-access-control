@@ -1,76 +1,107 @@
-# Raspberry Pi 5 IoT API
+# API Reference
 
-API de gerenciamento de clusters Raspberry Pi, com controle de LEDs via GPIO, leitura, cadastro e histórico de RFID, monitoramento de dispositivos, integração RabbitMQ, health check e endpoints para dados em tempo real.
+O sistema expõe duas interfaces de comunicação:
+1.  **RabbitMQ Messages**: Para comunicação assíncrona entre Raspberries e Servidor.
+2.  **HTTP REST API**: Para o Frontend (Client) e integrações externas.
 
-## Visão Geral
+## 1. RabbitMQ (Async)
 
-Esta API fornece recursos essenciais para ambiente IoT embarcado em Raspberry Pi, permitindo o controle remoto de LEDs (interno e externo), leitura e gerenciamento de tags RFID, armazenamento de histórico e status do equipamento, além de integração nativa com fila RabbitMQ para monitoramento em tempo real.
+**Queue**: `rasp_data`
+**Publisher**: Raspberries (Edge Node)
+**Consumer**: Server
 
-***
+### Payload (Health Check)
+Enviado a cada 1 segundo (configurável) pelas Raspberries.
 
-## Funcionalidades
+```json
+{
+  "id": "raspberrypi",
+  "mem_usage": "512 MB",
+  "cpu_temp": "48.1°C",
+  "wifi_status": "MyWifiSSID",
+  "cpu_percent": 7.5,
+  "gpio_used_count": 0,
+  "spi_buses": 1,
+  "i2c_buses": 1,
+  "usb_devices_count": 3,
+  "net_bytes_sent": 102400,
+  "net_bytes_recv": 204800,
+  "net_ifaces": ["wlan0", "eth0"],
+  "timestamp": 1730264823.62
+}
+```
 
-- Controle remoto de LEDs internos e externos via GPIO.
-- Registro, atualização, listagem e remoção de tags RFID.
-- Histórico detalhado de operações em LEDs e leituras RFID.
-- Monitoramento de status dos dispositivos cadastrados.
-- API aberta para recebimento e exibição de dados em tempo real.
-- Endpoints de health check e estatísticas do sistema.
+---
 
-***
+## 2. HTTP REST API
 
-## Instalação
+**Base URL**: `http://<server-ip>:8000`
 
-### Pré-requisitos
+### Health & Status
 
-- Python 3.9+ instalado.
-- Raspberry Pi 5 (ou compatível) com GPIO configurado.
-- Banco de dados SQLite ou compatível com SQLAlchemy.
-- RabbitMQ disponível na rede.
+#### `GET /`
+Retorna status da API e versões.
+```json
+{
+  "status": "online",
+  "service": "Raspberry Pi 5 IoT",
+  "version": "3.0.0"
+}
+```
 
-***
+#### `GET /api/devices/status`
+Retorna lista de todas as Raspberries monitoradas e seu status atual.
 
-## Como Usar
+### Controle de LEDs
 
-- Os endpoints REST estão disponíveis após iniciar o servidor.
-- Doc automática: acesse `/docs` na URL base do seu servidor para explorar e testar os endpoints visualmente.
-- Use ferramentas como Postman, Insomnia ou cURL para testar manualmente.
+#### `POST /api/led/control`
+Liga ou desliga LEDs remotamente.
 
-***
+**Body**:
+```json
+{
+  "raspberry_id": "raspberrypi",
+  "led_type": "internal", 
+  "status": "ON",
+  "pin": 4
+}
+```
+*`led_type` pode ser "internal" ou "external".*
 
-## Documentação dos Endpoints
+### RFID
 
-Endpoints principais por categoria:
+#### `GET /api/rfid/history`
+Obtém log de leituras RFID.
+**Query Params**:
+- `limit`: N últimos registros (default 50)
+- `raspberry_id`: Filtra por nó
+- `uid`: Filtra por tag específica
 
-| Caminho                       | Verbo | Descrição                              |
-|-------------------------------|-------|----------------------------------------|
-| `/api/led/control`            | POST  | Controla LED: liga/desliga via GPIO.   |
-| `/api/led/{led_type}/on`      | POST  | Liga LED interno ou externo.           |
-| `/api/led/{led_type}/off`     | POST  | Desliga LED interno ou externo.        |
-| `/api/led/status`             | GET   | Consulta status dos LEDs.              |
-| `/api/led/history`            | GET   | Lista histórico de comandos LED.       |
-| `/api/rfid/read`              | POST  | Recebe evento de leitura RFID.         |
-| `/api/rfid/tag`               | POST  | Cria/atualiza nome de tag RFID.        |
-| `/api/rfid/tags`              | GET   | Lista todas as tags RFID.              |
-| `/api/rfid/tag/{uid}`         | GET   | Busca dados de tag específica.         |
-| `/api/rfid/tag/{uid}`         | DELETE| Remove uma tag RFID.                   |
-| `/api/rfid/history`           | GET   | Histórico de leituras RFID.            |
-| `/api/rfid/stats`             | GET   | Estatísticas de leituras RFID.         |
-| `/api/devices/status`         | GET   | Status de todos os dispositivos.       |
-| `/api/devices/{id}/status`    | GET   | Status de um dispositivo.              |
-| `/api/data/realtime`          | GET   | Lista dados recebidos em tempo real.   |
-| `/api/data`                   | POST  | Envia dados em tempo real.             |
-| `/health`, `/`                | GET   | Health check da API.                   |
-| `/api/stats`                  | GET   | Estatísticas gerais do sistema.        |
+#### `POST /api/rfid/tag`
+Cadastra ou atualiza nome de uma Tag.
+**Body**:
+```json
+{
+  "uid": "A1:B2:C3:D4",
+  "name": "Admin",
+  "raspberry_id": "raspberrypi"
+}
+```
 
-***
+### Servo / Porta
 
-## Estrutura do Projeto
+#### `POST /api/servo/open`
+Força a abertura da porta temporariamente.
+**Body**:
+```json
+{
+  "action": "open",
+  "raspberry_id": "raspberrypi",
+  "hold_time": 5.0
+}
+```
 
-- **main.py:** Arquivo principal da aplicação FastAPI.
-- **consumer.py:** Integração RabbitMQ (consumo de mensagens).
-- **gpio_handler.py:** Lógica de controle GPIO para LEDs.
-- **rfid_handler.py:** Lógica de leitura e polling de RFID.
-- **database.py:** Modelos e rotinas do banco de dados com SQLAlchemy.
-- **schemas.py:** Schemas Pydantic para validação.
-- **shared.py:** Utilidades compartilhadas entre módulos.
+## Exportação de Dados
+
+#### `GET /api/export/db.zip`
+Baixa um ZIP contendo tabelas do banco em formato CSV (backup/análise).
