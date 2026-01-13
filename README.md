@@ -4,6 +4,8 @@
   <p><strong>Mini-cluster de Controle de Acesso e Monitoramento IoT</strong></p>
 </div>
 
+![Montagem do Projeto](./docs/assets/montagem.jpg)
+
 ![Status do Projeto](https://img.shields.io/badge/Status-Concluído-brightgreen)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Vue.js](https://img.shields.io/badge/Vue.js-3.0-green)
