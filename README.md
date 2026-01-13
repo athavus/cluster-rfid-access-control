@@ -4,7 +4,7 @@
   <p><strong>Mini-cluster de Controle de Acesso e Monitoramento IoT</strong></p>
 </div>
 
-![Status do Projeto](https://img.shields.io/badge/Status-Em_Desenvolvimento-yellow)
+![Status do Projeto](https://img.shields.io/badge/Status-Concluído-brightgreen)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Vue.js](https://img.shields.io/badge/Vue.js-3.0-green)
 ![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.9-orange)
@@ -28,7 +28,7 @@ graph TD
 
     subgraph Core["Servidor Central"]
         Consumer[Consumer Service]
-        DB[(SQLite/SQLAlchemy)]
+        DB[("SQLite/SQLAlchemy")]
     end
 
     subgraph Presentation["Frontend"]
@@ -39,7 +39,7 @@ graph TD
     R2 -->|Health Check / RFID| MQ
     MQ -->|Filas: rasp_data, rfid_reads| Consumer
     Consumer -->|Persistência| DB
-    Client -->|Leitura (API)| DB
+    Client -->|Leitura API| DB
 ```
 
 ### Componentes Principais
